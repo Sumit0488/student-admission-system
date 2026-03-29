@@ -1,0 +1,104 @@
+entity:
+  name: Student
+  plural: Students
+  module: student-admission
+  description: Student admission records with academic and personal details
+
+fields:
+  - name: student_id
+    type: String
+    external_id: true
+    unique: true
+    description: Auto-generated unique student identifier (e.g. STU-ABC123-XY12)
+
+  - name: fullName
+    type: String
+    required: true
+    primary: true
+    searchable: true
+    description: Student's full legal name
+
+  - name: email
+    type: String
+    required: true
+    unique: true
+    searchable: true
+    description: Student's email address (used as login identifier)
+
+  - name: phone
+    type: String
+    description: Contact phone number
+
+  - name: program
+    type: String
+    filterable: true
+    searchable: true
+    description: Degree program (e.g. Computer Science, Business Administration)
+
+  - name: department
+    type: String
+    filterable: true
+    description: Faculty or department (e.g. Engineering, Arts)
+
+  - name: admissionStatus
+    type: String
+    enum: [APPLIED, APPROVED, REJECTED, ENROLLED]
+    default: APPLIED
+    filterable: true
+    description: Current admission status
+
+  - name: batch
+    type: String
+    filterable: true
+    description: Academic batch/year (e.g. 2024, 2024-Fall)
+
+  - name: term
+    type: Number
+    integer: true
+    description: Semester/term number (1–20)
+
+  - name: isDeleted
+    type: Boolean
+    default: false
+    description: Soft delete flag
+
+  - name: remarks
+    type: String
+    searchable: true
+    description: Additional notes or remarks
+
+operations:
+  include:
+    - create
+    - update
+    - softDelete
+    - restore
+    - get
+    - getByExternalId
+    - list
+    - count
+
+  custom:
+    - name: changeAdmissionStatus
+      type: mutation
+      description: Update student admission status with transition validation
+      input:
+        - name: student_id
+          type: String
+          required: true
+        - name: status
+          type: String
+          required: true
+          enum: [APPLIED, APPROVED, REJECTED, ENROLLED]
+      returns: Student
+
+status_transitions:
+  APPLIED:
+    - APPROVED
+    - REJECTED
+  APPROVED:
+    - ENROLLED
+    - REJECTED
+  REJECTED:
+    - APPLIED
+  ENROLLED: []
