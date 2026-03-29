@@ -17,13 +17,10 @@
 name: CD
 
 on:
-  # Manual trigger — run this only when you're ready to deploy.
-  # Go to: GitHub repo → Actions → CD → Run workflow
   workflow_dispatch:
 
-  # Uncomment the lines below AFTER you have added all secrets in GitHub:
-  # push:
-  #   branches: [main]
+  push:
+    branches: [main]
 
 jobs:
 
