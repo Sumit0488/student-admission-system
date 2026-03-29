@@ -1,0 +1,17 @@
+export const STUDENTS = [
+  { id: 1,  usn: '1RV21CS001', fullName: 'Aarav Sharma',    status: 'Live',      term: 5, program: 'B.Tech CSE',         batch: '2021–2025', department: 'Computer Science'    },
+  { id: 2,  usn: '1RV21EC045', fullName: 'Priya Patel',     status: 'Live',      term: 5, program: 'B.Tech ECE',         batch: '2021–2025', department: 'Electronics'         },
+  { id: 3,  usn: '1RV22CS034', fullName: 'Sneha Reddy',     status: 'Live',      term: 3, program: 'B.Tech CSE',         batch: '2022–2026', department: 'Computer Science'    },
+  { id: 4,  usn: '1RV21CV023', fullName: 'Arjun Singh',     status: 'Live',      term: 5, program: 'B.Tech Civil',       batch: '2021–2025', department: 'Civil Engineering'   },
+  { id: 5,  usn: '1RV23CS056', fullName: 'Dev Mehta',       status: 'Live',      term: 1, program: 'B.Tech CSE',         batch: '2023–2027', department: 'Computer Science'    },
+  { id: 6,  usn: '1RV21IS089', fullName: 'Ananya Iyer',     status: 'Live',      term: 5, program: 'B.Tech ISE',         batch: '2021–2025', department: 'Information Science' },
+  { id: 7,  usn: '1RV22AI012', fullName: 'Pooja Gupta',     status: 'Live',      term: 3, program: 'B.Tech AI & ML',     batch: '2022–2026', department: 'AI & Machine Learning'},
+  { id: 8,  usn: '1RV22ME067', fullName: 'Riya Desai',      status: 'Live',      term: 3, program: 'B.Tech ME',          batch: '2022–2026', department: 'Mechanical'          },
+  { id: 9,  usn: '1RV20ME012', fullName: 'Rohan Kumar',     status: 'Completed', term: 8, program: 'B.Tech ME',          batch: '2020–2024', department: 'Mechanical'          },
+  { id: 10, usn: '1RV20EE007', fullName: 'Kavya Nair',      status: 'Completed', term: 8, program: 'B.Tech EEE',         batch: '2020–2024', department: 'Electrical'          },
+  { id: 11, usn: '1RV20CS100', fullName: 'Vikram Joshi',    status: 'Previous',  term: 8, program: 'B.Tech CSE',         batch: '2020–2024', department: 'Computer Science'    },
+  { id: 12, usn: '1RV21DS034', fullName: 'Karthik Rao',     status: 'Cancelled', term: 3, program: 'B.Tech Data Science',batch: '2021–2025', department: 'Data Science'        },
+  { id: 13, usn: '1RV23EC010', fullName: 'Meera Krishnan',  status: 'Live',      term: 1, program: 'B.Tech ECE',         batch: '2023–2027', department: 'Electronics'         },
+  { id: 14, usn: '1RV22CV041', fullName: 'Siddharth Verma', status: 'Live',      term: 3, program: 'B.Tech Civil',       batch: '2022–2026', department: 'Civil Engineering'   },
+  { id: 15, usn: '1RV21EE033', fullName: 'Lakshmi Prasad',  status: 'Detained',  term: 5, program: 'B.Tech EEE',         batch: '2021–2025', department: 'Electrical'          },
+];

@@ -1,0 +1,36 @@
+{
+  "name": "student-admission-backend",
+  "version": "1.0.0",
+  "description": "Student Admission Management System - Backend API",
+  "main": "src/server.js",
+  "scripts": {
+    "start":  "node src/server.js",
+    "predev": "npx kill-port 4000 --silent || true",
+    "dev":    "nodemon src/server.js",
+    "test":   "node --test src/tests/*.test.js",
+    "lint":   "eslint src/ --ext .js --max-warnings 0"
+  },
+  "dependencies": {
+    "@apollo/server": "^4.9.5",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "exceljs": "^4.4.0",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.3.1",
+    "graphql": "^16.8.1",
+    "graphql-tag": "^2.12.6",
+    "joi": "^17.11.0",
+    "json2csv": "^6.0.0-alpha.2",
+    "mongoose": "^9.3.0",
+    "multer": "^2.1.1",
+    "pdf-parse": "^2.4.5",
+    "pdfkit": "^0.18.0",
+    "puppeteer": "^24.40.0",
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "kill-port": "^2.0.1",
+    "nodemon": "^3.0.2"
+  }
+}

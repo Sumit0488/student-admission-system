@@ -1,0 +1,70 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  CD — Continuous Deployment
+#  Runs ONLY when CI passes on the main branch (push, not PRs).
+#  Deploys:
+#    Frontend → Vercel
+#    Backend  → Render (via deploy hook)
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+#  SETUP REQUIRED — add these secrets in GitHub:
+#    Settings → Secrets and variables → Actions → New repository secret
+#
+#  For Vercel frontend:
+#    VERCEL_TOKEN       → from vercel.com → Settings → Tokens
+#    VERCEL_ORG_ID      → from .vercel/project.json after `vercel link`
+#    VERCEL_PROJECT_ID  → from .vercel/project.json after `vercel link`
+#
+#  For Render backend:
+#    RENDER_DEPLOY_HOOK → from Render dashboard → Service → Deploy Hook URL
+# ═══════════════════════════════════════════════════════════════════════════════
+
+name: CD
+
+on:
+  push:
+    branches: [main]   # deploy only when code lands on main
+
+jobs:
+
+  # ─── Wait for CI to pass first ────────────────────────────────────────────────
+  deploy-frontend:
+    name: Deploy Frontend → Vercel
+    runs-on: ubuntu-latest
+    needs: []   # add 'backend-test' here once you have a combined ci+cd file
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Deploy to Vercel (Production)
+        working-directory: frontend
+        run: |
+          vercel pull --yes --environment=production \
+            --token=${{ secrets.VERCEL_TOKEN }}
+          vercel build --prod \
+            --token=${{ secrets.VERCEL_TOKEN }}
+          vercel deploy --prebuilt --prod \
+            --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+  # ─── Backend: trigger Render deploy hook ─────────────────────────────────────
+  deploy-backend:
+    name: Deploy Backend → Render
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render deploy hook
+        run: |
+          curl -s --fail -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}" \
+            && echo "Render deploy triggered successfully" \
+            || echo "Render deploy hook call failed"

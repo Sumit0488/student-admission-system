@@ -1,0 +1,33 @@
+{
+  "name": "student-admission-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Student Admission System — monorepo root",
+  "scripts": {
+    "install:all":   "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "lint:backend":  "cd backend  && npx eslint src/ --ext .js  --max-warnings 0",
+    "lint:frontend": "cd frontend && npx eslint src/ --ext .jsx,.js --max-warnings 0",
+    "lint":          "npm run lint:backend && npm run lint:frontend",
+    "test:backend":  "cd backend  && npm test",
+    "test:frontend": "cd frontend && npm test",
+    "test":          "npm run test:backend && npm run test:frontend",
+    "prepare":       "husky install"
+  },
+  "devDependencies": {
+    "husky":      "^9.0.11",
+    "lint-staged": "^15.2.2"
+  },
+  "lint-staged": {
+    "backend/src/**/*.js": [
+      "eslint --fix --max-warnings 0",
+      "prettier --write"
+    ],
+    "frontend/src/**/*.{js,jsx}": [
+      "eslint --fix --max-warnings 0",
+      "prettier --write"
+    ],
+    "**/*.{json,md,css}": [
+      "prettier --write"
+    ]
+  }
+}

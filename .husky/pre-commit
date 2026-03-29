@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+# Husky pre-commit hook
+# Runs lint-staged: only lints/formats the files you actually changed.
+# If lint fails → commit is blocked.
+
+. "$(dirname -- "$0")/_/husky.sh"
+
+npx lint-staged
