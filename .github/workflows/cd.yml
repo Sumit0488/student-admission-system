@@ -1,17 +1,6 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 #  CD — Continuous Deployment
 #  Runs ONLY on push to main (not on PRs).
-#
-#  BEFORE THIS WORKS you must add secrets in GitHub:
-#    Repo → Settings → Secrets and variables → Actions → New repository secret
-#
-#  Vercel (frontend):
-#    VERCEL_TOKEN       → vercel.com → Account Settings → Tokens → Create
-#    VERCEL_ORG_ID      → vercel.com → Team Settings → General → Team ID
-#    VERCEL_PROJECT_ID  → vercel.com → Project → Settings → General → Project ID
-#
-#  Render (backend):
-#    RENDER_DEPLOY_HOOK → Render dashboard → your service → Settings → Deploy Hook
 # ═══════════════════════════════════════════════════════════════════════════════
 
 name: CD
@@ -24,11 +13,11 @@ on:
 
 jobs:
 
-  # ─── Frontend → Vercel ────────────────────────────────────────────────────────
+  # ─── Full-stack → Vercel ──────────────────────────────────────────────────────
   deploy-frontend:
-    name: Deploy Frontend → Vercel
+    name: Deploy → Vercel
     runs-on: ubuntu-latest
-    continue-on-error: true   # don't fail the whole workflow if secrets not set
+    continue-on-error: true
 
     steps:
       - name: Check Vercel secrets are configured
@@ -37,7 +26,6 @@ jobs:
           if [ -z "$TOKEN" ]; then
             echo "ready=false" >> $GITHUB_OUTPUT
             echo "⚠️  VERCEL_TOKEN secret is not set — skipping Vercel deployment."
-            echo "   Add it at: Repo → Settings → Secrets → Actions → New secret"
           else
             echo "ready=true" >> $GITHUB_OUTPUT
             echo "Vercel token found — proceeding with deployment."
@@ -54,13 +42,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        if: steps.check.outputs.ready == 'true'
-        working-directory: frontend
-        run: npm ci
 
       - name: Install Vercel CLI
         if: steps.check.outputs.ready == 'true'
@@ -68,7 +49,6 @@ jobs:
 
       - name: Pull Vercel project settings
         if: steps.check.outputs.ready == 'true'
-        working-directory: frontend
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
@@ -76,7 +56,6 @@ jobs:
 
       - name: Build for production
         if: steps.check.outputs.ready == 'true'
-        working-directory: frontend
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
@@ -84,41 +63,7 @@ jobs:
 
       - name: Deploy to Vercel
         if: steps.check.outputs.ready == 'true'
-        working-directory: frontend
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-  # ─── Backend → Render ─────────────────────────────────────────────────────────
-  deploy-backend:
-    name: Deploy Backend → Render
-    runs-on: ubuntu-latest
-    continue-on-error: true   # don't fail the whole workflow if secrets not set
-
-    steps:
-      - name: Check Render secret is configured
-        id: check
-        run: |
-          if [ -z "$HOOK" ]; then
-            echo "ready=false" >> $GITHUB_OUTPUT
-            echo "⚠️  RENDER_DEPLOY_HOOK secret is not set — skipping Render deployment."
-            echo "   Add it at: Repo → Settings → Secrets → Actions → New secret"
-          else
-            echo "ready=true" >> $GITHUB_OUTPUT
-            echo "Render deploy hook found — proceeding with deployment."
-          fi
-        env:
-          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
-
-      - name: Trigger Render deploy
-        if: steps.check.outputs.ready == 'true'
-        run: |
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}")
-          echo "Render response: $HTTP_STATUS"
-          if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "201" ]; then
-            echo "Render deploy hook returned $HTTP_STATUS"
-            exit 1
-          fi
-          echo "Render deploy triggered successfully"
