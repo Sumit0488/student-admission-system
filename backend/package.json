@@ -4,14 +4,15 @@
   "description": "Student Admission Management System - Backend API",
   "main": "src/server.js",
   "scripts": {
-    "start":  "node src/server.js",
+    "start": "node src/server.js",
     "predev": "npx kill-port 4000 --silent || true",
-    "dev":    "nodemon src/server.js",
-    "test":   "node --test src/tests/*.test.js",
-    "lint":   "eslint src/ --ext .js --max-warnings 0"
+    "dev": "nodemon src/server.js",
+    "test": "node --test src/tests/*.test.js",
+    "lint": "eslint src/ --ext .js --max-warnings 0"
   },
   "dependencies": {
     "@apollo/server": "^4.9.5",
+    "@sparticuz/chromium-min": "^143.0.4",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
@@ -27,6 +28,7 @@
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.18.0",
     "puppeteer": "^24.40.0",
+    "puppeteer-core": "^24.40.0",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {

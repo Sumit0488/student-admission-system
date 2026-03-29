@@ -3,7 +3,30 @@ const router               = express.Router();
 const multer               = require('multer');
 const pdfParse             = require('pdf-parse');
 const { createWorker }     = require('tesseract.js');
-const puppeteer            = require('puppeteer');
+const puppeteer            = require('puppeteer-core');
+const chromium             = require('@sparticuz/chromium-min');
+
+// On Vercel (production) use @sparticuz/chromium-min; locally use the system Chrome
+const CHROMIUM_URL =
+  'https://github.com/Sparticuz/chromium/releases/download/v143.0.0/chromium-v143.0.0-pack.tar';
+
+async function getLaunchOptions() {
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+    return {
+      args:            chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath:  await chromium.executablePath(CHROMIUM_URL),
+      headless:        chromium.headless,
+    };
+  }
+  // Local dev — use the Chromium that puppeteer downloaded
+  const localPuppeteer = require('puppeteer');
+  return {
+    executablePath: localPuppeteer.executablePath(),
+    headless:       true,
+    args:           ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+  };
+}
 const Certificate          = require('../models/certificate.model');
 const CertificateTemplate  = require('../models/certificate-template.model');
 const Approval             = require('../models/approval.model');
@@ -559,10 +582,7 @@ router.get('/pdf/:id', async (req, res) => {
     const html     = buildCertHtml(cert, issuedOn);
     const filename = `${cert.type.replace(/\s+/g, '_')}_${cert.usn}.pdf`;
 
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
-    });
+    browser = await puppeteer.launch(await getLaunchOptions());
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
     const pdfBuffer = await page.pdf({
