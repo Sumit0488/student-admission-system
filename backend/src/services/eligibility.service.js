@@ -33,11 +33,11 @@ const RULES = {
   // ── Attendance (≥ 75%) ─────────────────────────────────────────────────────
   attendance75: {
     label: 'Attendance must be at least 75%',
-    test: (s) => s.attendance == null || s.attendance >= 75,
+    test: (s) => s.attendance === null || s.attendance === undefined || s.attendance >= 75,
   },
   attendance50: {
     label: 'Attendance must be at least 50%',
-    test: (s) => s.attendance == null || s.attendance >= 50,
+    test: (s) => s.attendance === null || s.attendance === undefined || s.attendance >= 50,
   },
 
   // ── Academic record ────────────────────────────────────────────────────────
