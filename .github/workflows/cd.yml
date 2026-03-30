@@ -1,6 +1,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 #  CD — Continuous Deployment
 #  Runs ONLY on push to main (not on PRs).
+#  Deploys full-stack app to Vercel (frontend + backend API function).
 # ═══════════════════════════════════════════════════════════════════════════════
 
 name: CD
@@ -14,10 +15,9 @@ on:
 jobs:
 
   # ─── Full-stack → Vercel ──────────────────────────────────────────────────────
-  deploy-frontend:
+  deploy:
     name: Deploy → Vercel
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Check Vercel secrets are configured
@@ -26,12 +26,20 @@ jobs:
           if [ -z "$TOKEN" ]; then
             echo "ready=false" >> $GITHUB_OUTPUT
             echo "⚠️  VERCEL_TOKEN secret is not set — skipping Vercel deployment."
+          elif [ -z "$ORG_ID" ]; then
+            echo "ready=false" >> $GITHUB_OUTPUT
+            echo "⚠️  VERCEL_ORG_ID secret is not set — skipping Vercel deployment."
+          elif [ -z "$PROJECT_ID" ]; then
+            echo "ready=false" >> $GITHUB_OUTPUT
+            echo "⚠️  VERCEL_PROJECT_ID secret is not set — skipping Vercel deployment."
           else
             echo "ready=true" >> $GITHUB_OUTPUT
-            echo "Vercel token found — proceeding with deployment."
+            echo "✅ All Vercel secrets found — proceeding with deployment."
           fi
         env:
-          TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          TOKEN:      ${{ secrets.VERCEL_TOKEN }}
+          ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+          PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Checkout code
         if: steps.check.outputs.ready == 'true'
@@ -49,21 +57,24 @@ jobs:
 
       - name: Pull Vercel project settings
         if: steps.check.outputs.ready == 'true'
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment=production
         env:
+          VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      - name: Build for production
+      - name: Build for Vercel production
         if: steps.check.outputs.ready == 'true'
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel build --prod
         env:
+          VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      - name: Deploy to Vercel
+      - name: Deploy prebuilt output to Vercel
         if: steps.check.outputs.ready == 'true'
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel deploy --prebuilt --prod
         env:
+          VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
