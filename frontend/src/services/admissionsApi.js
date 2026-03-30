@@ -1,14 +1,14 @@
-import axios from 'axios';
+import api from './api';
 
 const BASE = '/api';
 
 // ── Enquiry ────────────────────────────────────────────────────────────────────
-export const getEnquiries      = (params = {}) => axios.get(`${BASE}/enquiry`, { params });
-export const createEnquiry     = (data)        => axios.post(`${BASE}/enquiry/create`, data);
-export const updateEnquiry     = (id, data)    => axios.put(`${BASE}/enquiry/${id}`, data);
-export const addFollowUp       = (id, data)    => axios.post(`${BASE}/enquiry/${id}/followup`, data);
-export const convertEnquiry    = (id, data={}) => axios.post(`${BASE}/enquiry/convert/${id}`, data);
-export const deleteEnquiry     = (id)          => axios.delete(`${BASE}/enquiry/${id}`);
+export const getEnquiries      = (params = {}) => api.get(`${BASE}/enquiry`, { params });
+export const createEnquiry     = (data)        => api.post(`${BASE}/enquiry/create`, data);
+export const updateEnquiry     = (id, data)    => api.put(`${BASE}/enquiry/${id}`, data);
+export const addFollowUp       = (id, data)    => api.post(`${BASE}/enquiry/${id}/followup`, data);
+export const convertEnquiry    = (id, data={}) => api.post(`${BASE}/enquiry/convert/${id}`, data);
+export const deleteEnquiry     = (id)          => api.delete(`${BASE}/enquiry/${id}`);
 
 // Stage-move helper — maps a UI pipeline stage to the right DB patch
 const STAGE_PATCH = {
@@ -19,46 +19,46 @@ const STAGE_PATCH = {
   Cancelled:   { admissionStage: 'Cancelled' },
 };
 export const moveEnquiryStage = (id, stage) =>
-  axios.put(`${BASE}/enquiry/${id}`, STAGE_PATCH[stage]);
+  api.put(`${BASE}/enquiry/${id}`, STAGE_PATCH[stage]);
 
 // ── Schedules ──────────────────────────────────────────────────────────────────
-export const getSchedules        = ()    => axios.get(`${BASE}/schedules`);
-export const getAdmissionStages  = ()    => axios.get(`${BASE}/schedules/stages`);
-export const getSchedule         = (id)  => axios.get(`${BASE}/schedules/${id}`);
-export const createSchedule  = (data)   => axios.post(`${BASE}/schedules/create`, data);
-export const updateSchedule  = (id, d)  => axios.put(`${BASE}/schedules/${id}`, d);
-export const deleteSchedule  = (id)     => axios.delete(`${BASE}/schedules/${id}`);
+export const getSchedules        = ()    => api.get(`${BASE}/schedules`);
+export const getAdmissionStages  = ()    => api.get(`${BASE}/schedules/stages`);
+export const getSchedule         = (id)  => api.get(`${BASE}/schedules/${id}`);
+export const createSchedule  = (data)   => api.post(`${BASE}/schedules/create`, data);
+export const updateSchedule  = (id, d)  => api.put(`${BASE}/schedules/${id}`, d);
+export const deleteSchedule  = (id)     => api.delete(`${BASE}/schedules/${id}`);
 
 // ── Approvals ──────────────────────────────────────────────────────────────────
-export const getApprovals    = (params = {}) => axios.get(`${BASE}/approvals`, { params });
-export const updateApproval  = (id, data)    => axios.put(`${BASE}/approvals/${id}`, data);
+export const getApprovals    = (params = {}) => api.get(`${BASE}/approvals`, { params });
+export const updateApproval  = (id, data)    => api.put(`${BASE}/approvals/${id}`, data);
 
 // ── Certificates ───────────────────────────────────────────────────────────────
-export const getCertificates            = (params = {}) => axios.get(`${BASE}/certificates`, { params });
-export const getCertificatesByStudent   = (usn)         => axios.get(`${BASE}/certificates`, { params: { usn } });
-export const createCertificate   = (data) => axios.post(`${BASE}/certificates/create`, data);
-export const issueCertificate    = (data) => axios.post(`${BASE}/certificates/issue`, data);
-export const approveCertificate  = (id)   => axios.patch(`${BASE}/certificates/${id}/approve`);
-export const rejectCertificate   = (id)   => axios.patch(`${BASE}/certificates/${id}/reject`);
+export const getCertificates            = (params = {}) => api.get(`${BASE}/certificates`, { params });
+export const getCertificatesByStudent   = (usn)         => api.get(`${BASE}/certificates`, { params: { usn } });
+export const createCertificate   = (data) => api.post(`${BASE}/certificates/create`, data);
+export const issueCertificate    = (data) => api.post(`${BASE}/certificates/issue`, data);
+export const approveCertificate  = (id)   => api.patch(`${BASE}/certificates/${id}/approve`);
+export const rejectCertificate   = (id)   => api.patch(`${BASE}/certificates/${id}/reject`);
 export const downloadCertificate = (id)   =>
-  axios.get(`${BASE}/certificates/pdf/${id}`, { responseType: 'blob' });
+  api.get(`${BASE}/certificates/pdf/${id}`, { responseType: 'blob' });
 
 // ── Certificate Requests (student self-service) ────────────────────────────────
-export const submitCertificateRequest  = (data)        => axios.post(`${BASE}/certificate-requests`, data);
-export const getStudentRequests        = (usn)          => axios.get(`${BASE}/certificate-requests/student/${encodeURIComponent(usn)}`);
-export const getAllCertificateRequests = (params = {})  => axios.get(`${BASE}/certificate-requests`, { params });
-export const updateCertificateRequest  = (id, data)    => axios.put(`${BASE}/certificate-requests/${id}`, data);
+export const submitCertificateRequest  = (data)        => api.post(`${BASE}/certificate-requests`, data);
+export const getStudentRequests        = (usn)          => api.get(`${BASE}/certificate-requests/student/${encodeURIComponent(usn)}`);
+export const getAllCertificateRequests = (params = {})  => api.get(`${BASE}/certificate-requests`, { params });
+export const updateCertificateRequest  = (id, data)    => api.put(`${BASE}/certificate-requests/${id}`, data);
 
 // ── Certificate Templates ──────────────────────────────────────────────────────
-export const getTemplates       = ()       => axios.get(`${BASE}/certificates/templates`);
-export const getTemplate        = (id)     => axios.get(`${BASE}/certificates/templates/${id}`);
-export const createTemplate     = (data)   => axios.post(`${BASE}/certificates/templates`, data);
-export const updateTemplate     = (id, d)  => axios.put(`${BASE}/certificates/templates/${id}`, d);
-export const deleteTemplate     = (id)     => axios.delete(`${BASE}/certificates/templates/${id}`);
+export const getTemplates       = ()       => api.get(`${BASE}/certificates/templates`);
+export const getTemplate        = (id)     => api.get(`${BASE}/certificates/templates/${id}`);
+export const createTemplate     = (data)   => api.post(`${BASE}/certificates/templates`, data);
+export const updateTemplate     = (id, d)  => api.put(`${BASE}/certificates/templates/${id}`, d);
+export const deleteTemplate     = (id)     => api.delete(`${BASE}/certificates/templates/${id}`);
 export const uploadPdfTemplate  = (file)   => {
   const fd = new FormData();
   fd.append('pdf', file);
-  return axios.post(`${BASE}/certificates/templates/upload-pdf`, fd, {
+  return api.post(`${BASE}/certificates/templates/upload-pdf`, fd, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 };

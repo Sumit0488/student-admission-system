@@ -837,7 +837,7 @@ export default function StudentsPage() {
         console.log('[Config] programs:', data.data?.programs);
         console.log('[Config] batches :', data.data?.batches);
         console.log('[Config] statuses:', data.data?.statuses);
-        setConfig(data.data);
+        if (data.data?.programs?.length) setConfig(data.data);
       })
       .catch((err) => {
         console.error('[Config] ❌ Failed to fetch /api/config:', err.message);
