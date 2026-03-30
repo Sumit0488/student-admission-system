@@ -125,7 +125,7 @@ export default function StudentListPage() {
             <span>Showing results for:</span>
             {search && (
               <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
-                "{search}"
+                &quot;{search}&quot;
               </span>
             )}
             {statusFilter !== 'ALL' && (

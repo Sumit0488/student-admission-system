@@ -634,7 +634,7 @@ function textToHtml(rawText) {
 
     // Detect likely heading: short ALL-CAPS or ends with ':'
     const isHeading = line.length < 80 &&
-      (/^[A-Z0-9][A-Z0-9 \-\/\(\)&,.:]+$/.test(line) || line.endsWith(':'));
+      (/^[A-Z0-9][A-Z0-9 /()&,.:-]+$/.test(line) || line.endsWith(':'));
 
     if (isHeading) {
       flushPara();

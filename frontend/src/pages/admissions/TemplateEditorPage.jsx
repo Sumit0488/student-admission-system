@@ -579,7 +579,7 @@ export default function TemplateEditorPage() {
     return null;
   };
 
-  const handleEditorClick = (e) => {
+  const handleEditorClick = (_e) => {
     const table = findTableAtCursor();
     if (table) {
       const rect = table.getBoundingClientRect();
@@ -1061,7 +1061,7 @@ export default function TemplateEditorPage() {
 
               {fields.length === 0 ? (
                 <div className="text-center py-12 border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-xl">
-                  <p className="text-sm text-gray-400">No fields yet — click "+ Add Field"</p>
+                  <p className="text-sm text-gray-400">No fields yet — click &quot;+ Add Field&quot;</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">

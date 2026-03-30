@@ -480,7 +480,7 @@ export default function SchedulesPage() {
                     <input value={form.regPrefix} onChange={set('regPrefix')}
                       placeholder="REG2025" className={inp(errors.regPrefix)} />
                     <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-1">
-                      e.g. '7RL' → 7RL001, 7RL002…
+                      e.g. &apos;7RL&apos; → 7RL001, 7RL002…
                     </p>
                     {errors.regPrefix && <p className="text-xs text-red-500 mt-1">{errors.regPrefix}</p>}
                   </div>
@@ -489,7 +489,7 @@ export default function SchedulesPage() {
                     <input value={form.applicantPrefix} onChange={set('applicantPrefix')}
                       placeholder="APP2025" className={inp(errors.applicantPrefix)} />
                     <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-1">
-                      e.g. '23RL' → 23RL001, 23RL002…
+                      e.g. &apos;23RL&apos; → 23RL001, 23RL002…
                     </p>
                     {errors.applicantPrefix && <p className="text-xs text-red-500 mt-1">{errors.applicantPrefix}</p>}
                   </div>

@@ -1,7 +1,10 @@
 {
-  "installCommand": "npm install && cd backend && npm install",
+  "installCommand": "npm install && cd backend && npm install --omit=dev",
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
+  "env": {
+    "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true"
+  },
   "functions": {
     "api/[...path].js": {
       "maxDuration": 60

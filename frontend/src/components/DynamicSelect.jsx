@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getMasterData, createMasterData } from '../services/masterDataApi';
 
 /**
@@ -32,7 +32,7 @@ export default function DynamicSelect({
   const [saving,     setSaving]     = useState(false);
   const [error,      setError]      = useState('');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!type) return;
     setLoading(true);
     try {
@@ -50,9 +50,9 @@ export default function DynamicSelect({
     } finally {
       setLoading(false);
     }
-  };
+  }, [type]);
 
-  useEffect(() => { load(); }, [type]);
+  useEffect(() => { load(); }, [load]);
 
   const handleChange = (e) => {
     if (e.target.value === '__add_new__') {

@@ -562,7 +562,7 @@ function DeleteDialog({ student, onConfirm, onCancel, deleting }) {
           </div>
         </div>
         <p className="text-sm text-gray-600 dark:text-slate-300 mb-5">
-          Are you sure you want to delete <span className="font-semibold text-gray-900 dark:text-white">"{student.fullName}"</span>?
+          Are you sure you want to delete <span className="font-semibold text-gray-900 dark:text-white">&quot;{student.fullName}&quot;</span>?
         </p>
         <div className="flex gap-3">
           <button
@@ -844,7 +844,7 @@ export default function StudentsPage() {
         toast('Could not load dropdown config from server', 'error');
       })
       .finally(() => setConfigLoading(false));
-  }, []);
+  }, [toast]);
 
   // Fetch distinct programs from actual student data (for filter panel)
   useEffect(() => {

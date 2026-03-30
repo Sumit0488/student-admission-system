@@ -18,7 +18,7 @@ const DEFAULT_YEAR = { Regular: 1, Lateral: 2 };
 // Only validates the term number is correct — does NOT check enabled flag.
 // Both Regular and Lateral are always valid; the schedule config controls terms.
 function validateTerm(category, term, schedule) {
-  if (!category || term == null) return null;
+  if (!category || term === null || term === undefined) return null;
   const key    = category.toLowerCase();
   const config = schedule?.admissionType?.[key];
   // Only reject if allowedTerms are explicitly set AND the term is not in the list
@@ -97,7 +97,7 @@ router.post('/create', async (req, res) => {
       // programme & admission
       program:           b.program          || '',
       admissionCategory: b.admissionCategory || '',
-      term:              b.term != null ? Number(b.term) : null,
+      term:              b.term !== null && b.term !== undefined ? Number(b.term) : null,
       admissionDate:     b.admissionDate     || null,
       admissionMode:     b.admissionMode     || '',
       quota:             b.quota             || '',
@@ -167,16 +167,16 @@ router.post('/create', async (req, res) => {
 
       // Auto-assign term + year from admissionCategory when not supplied by client
       if (payload.admissionCategory) {
-        if (payload.term == null) {
+        if (payload.term === null || payload.term === undefined) {
           payload.term = resolveTermForCategory(payload.admissionCategory, schedule);
         }
-        if (payload.year_of_study == null) {
+        if (payload.year_of_study === null || payload.year_of_study === undefined) {
           payload.year_of_study = resolveYearForCategory(payload.admissionCategory);
         }
       }
 
       // Term validation (only checks allowedTerms list, not enabled flag)
-      if (payload.admissionCategory && payload.term != null) {
+      if (payload.admissionCategory && payload.term !== null && payload.term !== undefined) {
         const termErr = validateTerm(payload.admissionCategory, payload.term, schedule);
         if (termErr) return res.status(400).json({ success: false, error: termErr });
       }
@@ -244,14 +244,14 @@ router.post('/convert/:id', async (req, res) => {
       if (!schedule) return res.status(404).json({ success: false, error: 'Linked schedule not found' });
 
       // Auto-assign term if enquiry has category but no term set
-      if (enquiry.admissionCategory && enquiry.term == null) {
+      if (enquiry.admissionCategory && (enquiry.term === null || enquiry.term === undefined)) {
         const autoTerm = resolveTermForCategory(enquiry.admissionCategory, schedule);
-        if (autoTerm != null) await Enquiry.findByIdAndUpdate(enquiry._id, { term: autoTerm });
+        if (autoTerm !== null && autoTerm !== undefined) await Enquiry.findByIdAndUpdate(enquiry._id, { term: autoTerm });
         enquiry.term = autoTerm;
       }
 
       // Term validation (only checks allowedTerms list, not enabled flag)
-      if (enquiry.admissionCategory && enquiry.term != null) {
+      if (enquiry.admissionCategory && enquiry.term !== null && enquiry.term !== undefined) {
         const termErr = validateTerm(enquiry.admissionCategory, enquiry.term, schedule);
         if (termErr) return res.status(400).json({ success: false, error: termErr });
       }
@@ -355,7 +355,7 @@ router.put('/:id', async (req, res) => {
     ALLOWED.forEach((f) => { if (req.body[f] !== undefined) update[f] = req.body[f]; });
 
     // Auto-assign term from admissionCategory when not explicitly provided
-    if (update.admissionCategory && update.term == null) {
+    if (update.admissionCategory && (update.term === null || update.term === undefined)) {
       const enqForTerm = await Enquiry.findById(req.params.id).select('scheduleId term');
       if (enqForTerm?.scheduleId) {
         const schedForTerm = await Schedule.findById(enqForTerm.scheduleId);
@@ -364,11 +364,11 @@ router.put('/:id', async (req, res) => {
           update.year_of_study = resolveYearForCategory(update.admissionCategory);
         }
       }
-      if (update.term == null) update.term = DEFAULT_TERM[update.admissionCategory] ?? null;
+      if (update.term === null || update.term === undefined) update.term = DEFAULT_TERM[update.admissionCategory] ?? null;
     }
 
     // Term validation if schedule linked (only checks allowedTerms, not enabled flag)
-    if (update.admissionCategory && update.term != null) {
+    if (update.admissionCategory && update.term !== null && update.term !== undefined) {
       const enquiry = await Enquiry.findById(req.params.id).select('scheduleId');
       if (enquiry?.scheduleId) {
         const schedule = await Schedule.findById(enquiry.scheduleId);

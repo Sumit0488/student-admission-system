@@ -40,7 +40,7 @@ export default function DashboardPage() {
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl p-6 text-white">
         <p className="text-blue-200 text-sm mb-1">Welcome back,</p>
         <h2 className="text-2xl font-bold mb-1">Admin User 👋</h2>
-        <p className="text-blue-100 text-sm">Here's what's happening at your institution today.</p>
+        <p className="text-blue-100 text-sm">Here&apos;s what&apos;s happening at your institution today.</p>
       </div>
 
       {/* Stat Cards */}

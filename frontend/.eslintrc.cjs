@@ -19,6 +19,7 @@ module.exports = {
   },
   rules: {
     'react/react-in-jsx-scope': 'off',  // not needed with Vite/React 17+
+    'react/prop-types':         'off',  // JS codebase — PropTypes not used
     'no-unused-vars':           ['warn', { argsIgnorePattern: '^_' }],
     'eqeqeq':                   ['error', 'always'],
     'no-var':                   'error',

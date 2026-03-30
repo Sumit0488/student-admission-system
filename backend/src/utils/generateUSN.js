@@ -29,7 +29,7 @@ const extractBranchCode = (program = '') => {
  * Uses findOneAndUpdate with $inc — guaranteed unique even under concurrent requests.
  */
 const generateUSN = async (program = '', batch = '') => {
-  const year   = batch ? batch.split(/[–\-]/)[0].trim() : String(new Date().getFullYear());
+  const year   = batch ? batch.split(/[–-]/)[0].trim() : String(new Date().getFullYear());
   const branch = extractBranchCode(program);
   const prefix = `STU-${year}-${branch}`;
 

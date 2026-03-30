@@ -52,7 +52,7 @@ const createStudent = async (body) => {
   const phone         = (body.phone         || '').trim();
   const personalEmail = (body.personalEmail || '').trim().toLowerCase();
   const address       = (body.address       || '').trim();
-  const term              = body.term != null ? Number(body.term) : null;
+  const term              = body.term !== null && body.term !== undefined ? Number(body.term) : null;
   const admissionCategory = (body.admissionCategory || '').trim();
 
   const slug  = name.toLowerCase().replace(/\s+/g, '.');
@@ -145,7 +145,7 @@ const updateStudent = async (id, body) => {
   const email         = body.email         !== undefined ? body.email.trim().toLowerCase()   : undefined;
   const personalEmail = body.personalEmail !== undefined ? body.personalEmail.trim().toLowerCase() : undefined;
   const address       = body.address       !== undefined ? body.address.trim()               : undefined;
-  const term              = body.term              !== undefined ? (body.term != null ? Number(body.term) : null) : undefined;
+  const term              = body.term              !== undefined ? (body.term !== null ? Number(body.term) : null) : undefined;
   const admissionCategory = body.admissionCategory !== undefined ? (body.admissionCategory || '').trim()           : undefined;
 
   if (phone) {
@@ -262,7 +262,7 @@ const exportFullReport = async () => {
         email:    s.email           || '',
         program:  s.program         || '',
         batch:    s.batch           || '',
-        semester: s.term != null ? String(s.term) : '',
+        semester: s.term !== null && s.term !== undefined ? String(s.term) : '',
         status,
       });
     }

@@ -404,7 +404,7 @@ export default function StudentProfilePage() {
             <InfoCard label="Degree"       value={student.degree || '—'} />
             <InfoCard label="Program"      value={student.program} />
             <InfoCard label="Batch"        value={student.batch} />
-            <InfoCard label="Term" value={student.semester != null ? `Term ${student.semester}` : '—'} />
+            <InfoCard label="Term" value={student.semester !== null && student.semester !== undefined ? `Term ${student.semester}` : '—'} />
             <InfoCard label="Status"       value={student.status} />
             <InfoCard label="Quota"        value={student.quota || 'General'} />
           </div>
@@ -436,7 +436,7 @@ export default function StudentProfilePage() {
                   <Field icon={GraduationCap} label="Degree"     name="degree"     value={form.degree}     editMode={editMode} onChange={handleChange} options={['BE', 'B.Tech', 'ME', 'M.Tech', 'MBA', 'MCA', 'BCA', 'B.Sc', 'M.Sc', 'PhD']} />
                   <Field icon={Calendar}     label="Batch"        name="batch"      value={form.batch}      editMode={editMode} onChange={handleChange} options={config.batches} />
                   <Field icon={CheckCircle}  label="Status"       name="status"     value={form.status}     editMode={editMode} onChange={handleChange} options={config.statuses} />
-                  <Field icon={GraduationCap} label="Term (assigned at admission)" name="semester" value={student.semester != null ? `Term ${student.semester}` : '—'} editMode={false} onChange={handleChange} readOnly />
+                  <Field icon={GraduationCap} label="Term (assigned at admission)" name="semester" value={student.semester !== null && student.semester !== undefined ? `Term ${student.semester}` : '—'} editMode={false} onChange={handleChange} readOnly />
                 </div>
 
                 {/* Eligibility */}
@@ -540,7 +540,7 @@ export default function StudentProfilePage() {
                   <div className="flex flex-col items-center justify-center py-12 text-gray-400 dark:text-slate-500">
                     <Award size={36} className="mb-3 opacity-40" />
                     <p className="text-sm font-medium">No certificates issued yet</p>
-                    <p className="text-xs mt-1">Click "Issue Certificate" to generate one</p>
+                    <p className="text-xs mt-1">Click &quot;Issue Certificate&quot; to generate one</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
