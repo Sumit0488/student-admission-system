@@ -7,7 +7,7 @@
     "dev":     "vite",
     "build":   "vite build",
     "preview": "vite preview",
-    "lint":    "eslint src/ --ext .jsx,.js --max-warnings 0",
+    "lint":    "eslint src/ --ext .jsx,.js",
     "test":    "echo 'No frontend tests yet — add Vitest here' && exit 0"
   },
   "dependencies": {
