@@ -9,6 +9,7 @@ const approvalRoutes   = require('./routes/approval.routes');
 const certRoutes           = require('./routes/certificate.routes');
 const certRequestRoutes    = require('./routes/certificate-request.routes');
 const masterDataRoutes     = require('./routes/master-data.routes');
+const eligibilityRoutes    = require('./routes/eligibility.routes');
 const { globalErrorHandler } = require('./utils/errorHandler');
 
 const CORS_OPTS = {
@@ -46,6 +47,7 @@ app.use('/api/approvals',    approvalRoutes);
 app.use('/api/certificates',         certRoutes);
 app.use('/api/certificate-requests', certRequestRoutes);
 app.use('/api/master-data',          masterDataRoutes);
+app.use('/api/eligibility',          eligibilityRoutes);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) =>
