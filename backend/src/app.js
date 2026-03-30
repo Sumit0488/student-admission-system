@@ -34,6 +34,7 @@ const apiLimiter = rateLimit({
 
 const app = express();
 
+app.set('trust proxy', 1);           // trust Vercel's reverse proxy for correct IP detection
 app.use(cors(CORS_OPTS));
 app.use(express.json({ limit: '10kb' }));   // reject oversized payloads
 app.use('/api', apiLimiter);                 // rate-limit all /api/* routes
