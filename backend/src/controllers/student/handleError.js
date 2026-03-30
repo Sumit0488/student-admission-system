@@ -20,7 +20,7 @@ const handleError = (err, res, action) => {
   if (err.name === 'CastError')
     return res.status(400).json({ success: false, action, error: `Invalid ID: ${err.value}` });
 
-  return res.status(500).json({ success: false, action, error: 'Internal server error' });
+  return res.status(500).json({ success: false, error: err.message });
 };
 
 module.exports = handleError;

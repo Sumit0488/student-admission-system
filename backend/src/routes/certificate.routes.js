@@ -1,15 +1,16 @@
 const express              = require('express');
 const router               = express.Router();
 const multer               = require('multer');
-const pdfParse             = require('pdf-parse');
+// const pdfParse             = require('pdf-parse');
 const { createWorker }     = require('tesseract.js');
-const puppeteer            = require('puppeteer-core');
-const chromium             = require('@sparticuz/chromium-min');
+// const puppeteer            = require('puppeteer-core');
+// const chromium             = require('@sparticuz/chromium-min');
 
 // On Vercel (production) use @sparticuz/chromium-min; locally use the system Chrome
 const CHROMIUM_URL =
   'https://github.com/Sparticuz/chromium/releases/download/v143.0.0/chromium-v143.0.0-pack.tar';
 
+/*
 async function getLaunchOptions() {
   if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
     return {
@@ -27,6 +28,7 @@ async function getLaunchOptions() {
     args:           ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
   };
 }
+*/
 const Certificate          = require('../models/certificate.model');
 const CertificateTemplate  = require('../models/certificate-template.model');
 const Approval             = require('../models/approval.model');
@@ -576,6 +578,10 @@ router.get('/pdf/:id', async (req, res) => {
     await cert.save();
     await Approval.findOneAndUpdate({ certificateRef: cert._id }, { status: 'Approved' });
 
+    // FALLBACK: Puppeteer removed for serverless compatibility
+    return res.status(200).json({ success: false, message: "Feature temporarily disabled" });
+
+    /*
     const issuedOn = cert.generatedDate.toLocaleDateString('en-IN', {
       day: 'numeric', month: 'long', year: 'numeric',
     });
@@ -596,6 +602,7 @@ router.get('/pdf/:id', async (req, res) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.end(pdfBuffer);
+    */
   } catch (err) {
     if (browser) { try { await browser.close(); } catch { /* ignore */ } }
     if (!res.headersSent) res.status(500).json({ success: false, error: err.message });
@@ -614,6 +621,7 @@ router.get('/pdf/:id', async (req, res) => {
  *  - Lines ending with ':' and short → treat as sub-headings
  *  - Everything else → <p>
  */
+/*
 function textToHtml(rawText) {
   // Normalise line endings
   const lines = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
@@ -658,6 +666,7 @@ function escHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+*/
 
 // POST /api/certificates/templates/upload-pdf
 router.post('/templates/upload-pdf', pdfUpload.single('pdf'), async (req, res) => {
@@ -665,6 +674,9 @@ router.post('/templates/upload-pdf', pdfUpload.single('pdf'), async (req, res) =
     return res.status(400).json({ success: false, error: 'No PDF file received' });
   }
 
+  return res.status(200).json({ success: false, message: "Feature temporarily disabled" });
+
+  /*
   let pageCount = 1;
   let html      = '';
   let warning   = null;
@@ -672,15 +684,11 @@ router.post('/templates/upload-pdf', pdfUpload.single('pdf'), async (req, res) =
 
   // ── Step 1: try pdf-parse (text-based PDFs) ──────────────────────────────
   try {
-    const parsed = await pdfParse(req.file.buffer);
-    pageCount    = parsed.numpages || 1;
-    const text   = (parsed.text || '').trim();
-
-    if (text.length >= 20) {
-      // Good text extraction
-      html = textToHtml(text);
-    }
-  } catch {
+    // FALLBACK: pdf-parse removed for serverless compatibility
+    throw new Error('Feature temporarily disabled');
+  } catch (err) {
+    // Return fallback immediately if OCR is also disabled or we want to blanket disable this.
+    return res.status(200).json({ success: false, message: "Feature temporarily disabled" });
     // pdf-parse threw — fall through to OCR
   }
 
@@ -704,13 +712,14 @@ router.post('/templates/upload-pdf', pdfUpload.single('pdf'), async (req, res) =
     } catch {
       html = '<p>OCR processing failed. Please add your content manually.</p>';
     } finally {
-      if (worker) { try { await worker.terminate(); } catch { /* ignore */ } }
+      if (worker) { try { await worker.terminate(); } catch { // ignore } }
     }
 
     warning = '⚠ Layout may not be perfect — scanned PDF detected. OCR was used; please review and adjust manually.';
   }
 
   res.json({ success: true, html, pages: pageCount, usedOcr, warning });
+  */
 });
 
 module.exports = router;

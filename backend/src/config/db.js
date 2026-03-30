@@ -11,24 +11,45 @@ dns.setDefaultResultOrder('ipv4first');
 // Use well-known public resolvers that are reachable over IPv4.
 dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
 
+// ─── Connection cache ─────────────────────────────────────────────────────────
+let connectionPromise = null;
+
 const connectDB = async () => {
   const uri = process.env.MONGO_URI;
   if (!uri) {
     console.error('❌ MONGO_URI is not defined in environment variables');
-    process.exit(1);
+    throw new Error('MONGO_URI is not defined in environment variables');
   }
 
-  try {
-    const conn = await mongoose.connect(uri, {
+  // Already open — reuse
+  if (mongoose.connection.readyState === 1) return Promise.resolve(mongoose.connection);
+
+  // Broken/disconnected — clear the stale promise and reconnect
+  if (
+    connectionPromise &&
+    [0, 3].includes(mongoose.connection.readyState)
+  ) {
+    connectionPromise = null;
+  }
+
+  if (!connectionPromise) {
+    console.log('[DB] Opening new MongoDB connection in connectDB...');
+    connectionPromise = mongoose.connect(uri, {
       family: 4,                    // Force IPv4 at the TCP socket level
       serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
+      connectTimeoutMS: 10000,
+    }).then((conn) => {
+      console.log(`✅ MongoDB connected: ${conn.connection.host}`);
+      return conn;
+    }).catch((err) => {
+      console.error('❌ MongoDB connection error:', err.message);
+      connectionPromise = null; // reset so next request retries
+      throw err;
     });
-    console.log(`✅ MongoDB connected: ${conn.connection.host}`);
-  } catch (err) {
-    console.error('❌ MongoDB connection error:', err.message);
-    process.exit(1);
   }
+
+  return connectionPromise;
 };
 
 module.exports = connectDB;
