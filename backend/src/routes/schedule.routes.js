@@ -1,5 +1,5 @@
-const express  = require('express');
-const router   = express.Router();
+const express = require('express');
+const router = express.Router();
 const Schedule = require('../models/schedule.model');
 
 // ── Strict admission-type → term mapping ──────────────────────────────────────
@@ -11,12 +11,53 @@ const ADMISSION_TYPE_MAP = {
 
 // Static pipeline stages (backend-driven as required)
 const PIPELINE_STAGES = [
-  { name: 'Inquiry',     value: '1' },
+  { name: 'Inquiry', value: '1' },
   { name: 'Application', value: '2' },
-  { name: 'Admitted',    value: '3' },
-  { name: 'Rejected',    value: '4' },
-  { name: 'Cancelled',   value: '5' },
+  { name: 'Admitted', value: '3' },
+  { name: 'Rejected', value: '4' },
+  { name: 'Cancelled', value: '5' },
 ];
+
+// ── Extract degree from schedule name ────────────────────────────────────────
+// "BE Admission 2026"   → "BE"
+// "BCA Admission 2025"  → "BCA"
+// "B.Tech CSE 2025"     → "B.Tech"
+// "MBA 2025"            → "MBA"
+// Rules: the first whitespace-delimited token that matches a known degree label,
+// OR simply the first word if nothing matches (so it always returns something).
+const KNOWN_DEGREES = [
+  'B.E',
+  'BE',
+  'B.Tech',
+  'BTech',
+  'M.E',
+  'ME',
+  'M.Tech',
+  'MTech',
+  'MBA',
+  'MCA',
+  'BCA',
+  'BBA',
+  'B.Sc',
+  'BSc',
+  'M.Sc',
+  'MSc',
+  'B.Com',
+  'BCom',
+  'M.Com',
+  'MCom',
+  'PhD',
+  'Ph.D',
+];
+
+function extractDegreeFromName(scheduleName) {
+  if (!scheduleName) return '';
+  const firstWord = scheduleName.trim().split(/\s+/)[0];
+  // Check if first word exactly matches a known degree (case-insensitive)
+  const match = KNOWN_DEGREES.find((d) => d.toLowerCase() === firstWord.toLowerCase());
+  // Return the canonical form if matched, otherwise return the first word as-is
+  return match || firstWord;
+}
 
 // Build admission_details from a schedule document.
 // Always includes both Regular and Lateral so the frontend dropdown is never empty.
@@ -60,15 +101,22 @@ router.get('/stages', (_req, res) => {
 router.post('/create', async (req, res) => {
   try {
     const { scheduleName, academicYear, regPrefix, applicantPrefix, maxSeats } = req.body;
-    if (!scheduleName?.trim())    return res.status(400).json({ success: false, error: 'Schedule name is required' });
-    if (!academicYear?.trim())    return res.status(400).json({ success: false, error: 'Academic year is required' });
-    if (!regPrefix?.trim())       return res.status(400).json({ success: false, error: 'Reg No prefix is required' });
-    if (!applicantPrefix?.trim()) return res.status(400).json({ success: false, error: 'Applicant ID prefix is required' });
+    if (!scheduleName?.trim())
+      return res.status(400).json({ success: false, error: 'Schedule name is required' });
+    if (!academicYear?.trim())
+      return res.status(400).json({ success: false, error: 'Academic year is required' });
+    if (!regPrefix?.trim())
+      return res.status(400).json({ success: false, error: 'Reg No prefix is required' });
+    if (!applicantPrefix?.trim())
+      return res.status(400).json({ success: false, error: 'Applicant ID prefix is required' });
     if (maxSeats !== undefined && (isNaN(maxSeats) || Number(maxSeats) < 1)) {
       return res.status(400).json({ success: false, error: 'Max seats must be a positive number' });
     }
 
-    const schedule = await Schedule.create(req.body);
+    const schedule = await Schedule.create({
+      ...req.body,
+      degree: extractDegreeFromName(req.body.scheduleName),
+    });
     const scheduleObj = schedule.toObject();
     scheduleObj.admission_details = buildAdmissionDetails(schedule);
     res.status(201).json({ success: true, data: scheduleObj });
@@ -93,14 +141,17 @@ router.get('/:id', async (req, res) => {
 // PUT /api/schedules/:id
 router.put('/:id', async (req, res) => {
   try {
-    // Always clear legacy degree/branch/stream fields — scheduleName is the source of truth
+    // Degree is always derived from scheduleName — never set manually
     const update = {
       ...req.body,
       stream: req.body.scheduleName || req.body.stream || '',
-      degree: '',
+      degree: extractDegreeFromName(req.body.scheduleName),
       branch: '',
     };
-    const schedule = await Schedule.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
+    const schedule = await Schedule.findByIdAndUpdate(req.params.id, update, {
+      new: true,
+      runValidators: true,
+    });
     if (!schedule) return res.status(404).json({ success: false, error: 'Schedule not found' });
     const scheduleObj = schedule.toObject();
     scheduleObj.admission_details = buildAdmissionDetails(schedule);

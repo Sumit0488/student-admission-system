@@ -1,5 +1,5 @@
-const Student               = require('../models/student.model');
-const generateUSN           = require('../utils/generateUSN');
+const Student = require('../models/student.model');
+const generateUSN = require('../utils/generateUSN');
 const { notFound, duplicate, validationErr } = require('../utils/errorHandler');
 const { validateCreateInput, validateUpdateInput, validateStatus } = require('../utils/validators');
 
@@ -22,40 +22,42 @@ const calculateTerm = (batch, admissionCategory) => {
 
 // ─── Response formatter (shapes DB document → API response) ──────────────────
 const format = (s) => ({
-  id:            String(s._id),
-  student_id:    s.student_id    || '',
-  name:          s.fullName,
-  email:         s.email         || '',
+  id: String(s._id),
+  student_id: s.student_id || '',
+  name: s.fullName,
+  email: s.email || '',
   personalEmail: s.personalEmail || '',
-  phone:         s.phone         || '',
-  address:       s.address       || '',
-  program:       s.program       || '',
-  degree:        s.degree        || '',
-  batch:         s.batch         || '',
-  department:    s.department    || s.program || '',
-  semester:      calculateTerm(s.batch, s.admissionCategory) ?? s.term ?? null,
+  phone: s.phone || '',
+  address: s.address || '',
+  city: s.city || '',
+  program: s.program || '',
+  degree: s.degree || '',
+  batch: s.batch || '',
+  department: s.department || s.program || '',
+  semester: calculateTerm(s.batch, s.admissionCategory) ?? s.term ?? null,
   admissionCategory: s.admissionCategory || '',
-  status:        s.admissionStatus,
-  isDebarred:    s.isDebarred    ?? false,
-  feesCleared:   s.feesCleared   ?? true,
-  createdAt:     s.createdAt,
+  status: s.admissionStatus,
+  isDebarred: s.isDebarred ?? false,
+  feesCleared: s.feesCleared ?? true,
+  createdAt: s.createdAt,
 });
 
 // ─── CREATE ───────────────────────────────────────────────────────────────────
 const createStudent = async (body) => {
   validateCreateInput(body);
 
-  const name          = toTitleCase((body.name || '').trim());
-  const program       = (body.program       || '').trim();
-  const batch         = (body.batch         || '').trim();
-  const status        = (body.status        || '').trim();
-  const phone         = (body.phone         || '').trim();
+  const name = toTitleCase((body.name || '').trim());
+  const program = (body.program || '').trim();
+  const batch = (body.batch || '').trim();
+  const status = (body.status || '').trim();
+  const phone = (body.phone || '').trim();
   const personalEmail = (body.personalEmail || '').trim().toLowerCase();
-  const address       = (body.address       || '').trim();
-  const term              = body.term !== null && body.term !== undefined ? Number(body.term) : null;
+  const address = (body.address || '').trim();
+  const city = (body.city || '').trim();
+  const term = body.term !== null && body.term !== undefined ? Number(body.term) : null;
   const admissionCategory = (body.admissionCategory || '').trim();
 
-  const slug  = name.toLowerCase().replace(/\s+/g, '.');
+  const slug = name.toLowerCase().replace(/\s+/g, '.');
   const email = (body.email?.trim() || `${slug}.${Date.now()}@student.edu`).toLowerCase();
 
   const existing = await Student.findOne({ email, isDeleted: { $ne: true } });
@@ -70,11 +72,12 @@ const createStudent = async (body) => {
 
   const student = await Student.create({
     student_id,
-    fullName:        name,
+    fullName: name,
     email,
     personalEmail,
     phone,
     address,
+    city,
     program,
     batch,
     term,
@@ -93,19 +96,21 @@ const getStudents = async (query = {}) => {
 
   if (q.trim()) {
     filter.$or = [
-      { fullName:   { $regex: q.trim(), $options: 'i' } },
+      { fullName: { $regex: q.trim(), $options: 'i' } },
       { student_id: { $regex: q.trim(), $options: 'i' } },
-      { program:    { $regex: q.trim(), $options: 'i' } },
+      { program: { $regex: q.trim(), $options: 'i' } },
     ];
   }
-  if (program) filter.program         = { $regex: new RegExp(`^${program.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
-  if (batch)   filter.batch           = batch;
-  if (status)  filter.admissionStatus = status;
+  if (program)
+    filter.program = {
+      $regex: new RegExp(`^${program.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+    };
+  if (batch) filter.batch = batch;
+  if (status) filter.admissionStatus = status;
 
-  const skip  = (Number(page) - 1) * Number(limit);
+  const skip = (Number(page) - 1) * Number(limit);
   const total = await Student.countDocuments(filter);
-  const students = await Student
-    .find(filter)
+  const students = await Student.find(filter)
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(Number(limit));
@@ -120,7 +125,9 @@ const getStatusCounts = async () => {
     { $group: { _id: '$admissionStatus', count: { $sum: 1 } } },
   ]);
   const counts = { Live: 0, Completed: 0, Cancelled: 0, Detained: 0 };
-  rows.forEach(({ _id, count }) => { if (_id in counts) counts[_id] = count; });
+  rows.forEach(({ _id, count }) => {
+    if (_id in counts) counts[_id] = count;
+  });
   return counts;
 };
 
@@ -135,44 +142,57 @@ const getStudentById = async (id) => {
 const updateStudent = async (id, body) => {
   validateUpdateInput(body);
 
-  const name          = body.name !== undefined ? toTitleCase(body.name.trim()) : undefined;
+  const name = body.name !== undefined ? toTitleCase(body.name.trim()) : undefined;
   if (name !== undefined && !name) throw validationErr('Full name cannot be empty');
-  const program       = body.program       !== undefined ? body.program.trim()               : undefined;
-  const degree        = body.degree        !== undefined ? body.degree.trim()                : undefined;
-  const batch         = body.batch         !== undefined ? body.batch.trim()                 : undefined;
-  const status        = body.status        !== undefined ? body.status.trim()                : undefined;
-  const phone         = body.phone         !== undefined ? body.phone.trim()                 : undefined;
-  const email         = body.email         !== undefined ? body.email.trim().toLowerCase()   : undefined;
-  const personalEmail = body.personalEmail !== undefined ? body.personalEmail.trim().toLowerCase() : undefined;
-  const address       = body.address       !== undefined ? body.address.trim()               : undefined;
-  const term              = body.term              !== undefined ? (body.term !== null ? Number(body.term) : null) : undefined;
-  const admissionCategory = body.admissionCategory !== undefined ? (body.admissionCategory || '').trim()           : undefined;
+  const program = body.program !== undefined ? body.program.trim() : undefined;
+  const degree = body.degree !== undefined ? body.degree.trim() || null : undefined;
+  const batch = body.batch !== undefined ? body.batch.trim() : undefined;
+  const status = body.status !== undefined ? body.status.trim() : undefined;
+  const phone = body.phone !== undefined ? body.phone.trim() : undefined;
+  const email = body.email !== undefined ? body.email.trim().toLowerCase() : undefined;
+  const personalEmail =
+    body.personalEmail !== undefined ? body.personalEmail.trim().toLowerCase() : undefined;
+  const address = body.address !== undefined ? body.address.trim() : undefined;
+  const city = body.city !== undefined ? body.city.trim() : undefined;
+  const term =
+    body.term !== undefined ? (body.term !== null ? Number(body.term) : null) : undefined;
+  const admissionCategory =
+    body.admissionCategory !== undefined ? (body.admissionCategory || '').trim() : undefined;
 
   if (phone) {
-    const phoneExists = await Student.findOne({ phone, isDeleted: { $ne: true }, _id: { $ne: id } });
+    const phoneExists = await Student.findOne({
+      phone,
+      isDeleted: { $ne: true },
+      _id: { $ne: id },
+    });
     if (phoneExists) throw duplicate('phone number');
   }
 
   if (email) {
-    const emailExists = await Student.findOne({ email, isDeleted: { $ne: true }, _id: { $ne: id } });
+    const emailExists = await Student.findOne({
+      email,
+      isDeleted: { $ne: true },
+      _id: { $ne: id },
+    });
     if (emailExists) throw duplicate('email');
   }
 
   const student = await Student.findOneAndUpdate(
     { _id: id, isDeleted: { $ne: true } },
     {
-      ...(name          !== undefined && { fullName: name }),
-      ...(program       !== undefined && { program }),
-      ...(degree        !== undefined && { degree }),
-      ...(batch         !== undefined && { batch }),
-      ...(status        !== undefined && { admissionStatus: status }),
-      ...(phone         !== undefined && { phone }),
-      ...(email         !== undefined && { email }),
-      ...(address       !== undefined && { address }),
+      ...(name !== undefined && { fullName: name }),
+      ...(program !== undefined && { program }),
+      ...(degree !== undefined && { degree }),
+      ...(batch !== undefined && { batch }),
+      ...(status !== undefined && { admissionStatus: status }),
+      ...(phone !== undefined && { phone }),
+      ...(email !== undefined && { email }),
+      ...(address !== undefined && { address }),
+      ...(city !== undefined && { city }),
       ...(personalEmail !== undefined && { personalEmail }),
-      ...(term              !== undefined && { term }),
+      ...(term !== undefined && { term }),
       ...(admissionCategory !== undefined && { admissionCategory }),
-      ...(body.isDebarred   !== undefined && { isDebarred:  Boolean(body.isDebarred) }),
+      ...(body.isDebarred !== undefined && { isDebarred: Boolean(body.isDebarred) }),
       ...(body.feesCleared !== undefined && { feesCleared: Boolean(body.feesCleared) }),
     },
     { new: true, runValidators: true }
@@ -195,7 +215,10 @@ const deleteStudent = async (id) => {
 
 // ─── DISTINCT PROGRAMS ───────────────────────────────────────────────────────
 const getDistinctPrograms = async () => {
-  const programs = await Student.distinct('program', { isDeleted: { $ne: true }, program: { $ne: '' } });
+  const programs = await Student.distinct('program', {
+    isDeleted: { $ne: true },
+    program: { $ne: '' },
+  });
   return programs.filter(Boolean).sort();
 };
 
@@ -228,16 +251,15 @@ const exportStudents = async (query = {}) => {
   const filter = { isDeleted: { $ne: true }, admissionStatus: 'Live' };
   if (program) filter.program = program;
 
-  const students = await Student
-    .find(filter)
+  const students = await Student.find(filter)
     .sort({ program: 1, student_id: 1 })
     .select('student_id fullName email program');
 
   return students.map((s) => ({
-    usn:     s.student_id || '',
-    name:    s.fullName   || '',
-    email:   s.email      || '',
-    program: s.program    || '',
+    usn: s.student_id || '',
+    name: s.fullName || '',
+    email: s.email || '',
+    program: s.program || '',
   }));
 };
 
@@ -245,23 +267,24 @@ const exportStudents = async (query = {}) => {
 const REPORT_STATUSES = ['Live', 'Completed', 'Cancelled', 'Detained'];
 
 const exportFullReport = async () => {
-  const students = await Student
-    .find({ isDeleted: { $ne: true } })
+  const students = await Student.find({ isDeleted: { $ne: true } })
     .sort({ admissionStatus: 1, program: 1, student_id: 1 })
     .select('student_id fullName email program batch admissionStatus');
 
   const groups = {};
-  REPORT_STATUSES.forEach((s) => { groups[s] = []; });
+  REPORT_STATUSES.forEach((s) => {
+    groups[s] = [];
+  });
 
   students.forEach((s) => {
     const status = s.admissionStatus || 'Live';
     if (groups[status]) {
       groups[status].push({
-        usn:      s.student_id      || '',
-        name:     s.fullName        || '',
-        email:    s.email           || '',
-        program:  s.program         || '',
-        batch:    s.batch           || '',
+        usn: s.student_id || '',
+        name: s.fullName || '',
+        email: s.email || '',
+        program: s.program || '',
+        batch: s.batch || '',
         semester: s.term !== null && s.term !== undefined ? String(s.term) : '',
         status,
       });

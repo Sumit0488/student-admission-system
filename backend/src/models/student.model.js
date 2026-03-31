@@ -79,12 +79,25 @@ const studentSchema = new mongoose.Schema(
     },
     feesCleared: {
       type: Boolean,
-      default: true,   // assume cleared unless explicitly marked otherwise
+      default: true, // assume cleared unless explicitly marked otherwise
     },
     address: {
       type: String,
       trim: true,
     },
+    city: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    // Personal details — copied from enquiry on admission
+    gender: { type: String, trim: true, default: '' },
+    dob: { type: Date, default: null },
+    religion: { type: String, trim: true, default: '' },
+    caste: { type: String, trim: true, default: '' },
+    fatherName: { type: String, trim: true, default: '' },
+    admissionDate: { type: Date, default: null },
+    lastJoiningDate: { type: Date, default: null },
     remarks: {
       type: String,
       trim: true,

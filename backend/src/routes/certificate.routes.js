@@ -1,61 +1,67 @@
-const express              = require('express');
-const router               = express.Router();
-const multer               = require('multer');
+const express = require('express');
+const router = express.Router();
+const multer = require('multer');
 // const pdfParse             = require('pdf-parse');
-const { createWorker }     = require('tesseract.js');
-// const puppeteer            = require('puppeteer-core');
-// const chromium             = require('@sparticuz/chromium-min');
-
-// On Vercel (production) use @sparticuz/chromium-min; locally use the system Chrome
+const { createWorker } = require('tesseract.js');
+const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium-min');
 const CHROMIUM_URL =
   'https://github.com/Sparticuz/chromium/releases/download/v143.0.0/chromium-v143.0.0-pack.tar';
 
-/*
 async function getLaunchOptions() {
   if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
     return {
-      args:            chromium.args,
+      args: chromium.args,
       defaultViewport: chromium.defaultViewport,
-      executablePath:  await chromium.executablePath(CHROMIUM_URL),
-      headless:        chromium.headless,
+      executablePath: await chromium.executablePath(CHROMIUM_URL),
+      headless: chromium.headless,
     };
   }
   // Local dev — use the Chromium that puppeteer downloaded
   const localPuppeteer = require('puppeteer');
   return {
     executablePath: localPuppeteer.executablePath(),
-    headless:       true,
-    args:           ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
   };
 }
-*/
-const Certificate          = require('../models/certificate.model');
-const CertificateTemplate  = require('../models/certificate-template.model');
-const Approval             = require('../models/approval.model');
-const Student              = require('../models/student.model');
+const Certificate = require('../models/certificate.model');
+const CertificateTemplate = require('../models/certificate-template.model');
+const Approval = require('../models/approval.model');
+const Student = require('../models/student.model');
 
 // multer — memory storage (no temp files), 10 MB limit, PDF only
 const pdfUpload = multer({
   storage: multer.memoryStorage(),
-  limits:  { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype === 'application/pdf') cb(null, true);
     else cb(new Error('Only PDF files are accepted'));
   },
 });
 
+// multer — image upload, 5 MB limit, images only
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only image files are accepted (jpg, png, gif, webp, svg)'));
+  },
+});
+
 // ── Program name lookups ──────────────────────────────────────────────────────
 const PROGRAM_NAMES = {
-  CSE:   'Computer Science and Engineering',
-  ECE:   'Electronics and Communication Engineering',
-  MECH:  'Mechanical Engineering',
+  CSE: 'Computer Science and Engineering',
+  ECE: 'Electronics and Communication Engineering',
+  MECH: 'Mechanical Engineering',
   CIVIL: 'Civil Engineering',
-  MBA:   'Master of Business Administration',
-  MCA:   'Master of Computer Applications',
-  EEE:   'Electrical and Electronics Engineering',
-  ISE:   'Information Science and Engineering',
-  AIML:  'Artificial Intelligence and Machine Learning',
-  AIDS:  'Artificial Intelligence and Data Science',
+  MBA: 'Master of Business Administration',
+  MCA: 'Master of Computer Applications',
+  EEE: 'Electrical and Electronics Engineering',
+  ISE: 'Information Science and Engineering',
+  AIML: 'Artificial Intelligence and Machine Learning',
+  AIDS: 'Artificial Intelligence and Data Science',
   CSEDS: 'Computer Science and Engineering Data Science',
   CSEML: 'Computer Science and Engineering Machine Learning',
 };
@@ -85,28 +91,145 @@ const ORDINALS = ['', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
 
 const YEAR_ORDINALS = ['', '1st', '2nd', '3rd', '4th'];
 
+const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+const DAY_ORDINALS = [
+  '',
+  'First',
+  'Second',
+  'Third',
+  'Fourth',
+  'Fifth',
+  'Sixth',
+  'Seventh',
+  'Eighth',
+  'Ninth',
+  'Tenth',
+  'Eleventh',
+  'Twelfth',
+  'Thirteenth',
+  'Fourteenth',
+  'Fifteenth',
+  'Sixteenth',
+  'Seventeenth',
+  'Eighteenth',
+  'Nineteenth',
+  'Twentieth',
+  'Twenty First',
+  'Twenty Second',
+  'Twenty Third',
+  'Twenty Fourth',
+  'Twenty Fifth',
+  'Twenty Sixth',
+  'Twenty Seventh',
+  'Twenty Eighth',
+  'Twenty Ninth',
+  'Thirtieth',
+  'Thirty First',
+];
+
+const NUM_ONES = [
+  '',
+  'One',
+  'Two',
+  'Three',
+  'Four',
+  'Five',
+  'Six',
+  'Seven',
+  'Eight',
+  'Nine',
+  'Ten',
+  'Eleven',
+  'Twelve',
+  'Thirteen',
+  'Fourteen',
+  'Fifteen',
+  'Sixteen',
+  'Seventeen',
+  'Eighteen',
+  'Nineteen',
+];
+const NUM_TENS = [
+  '',
+  '',
+  'Twenty',
+  'Thirty',
+  'Forty',
+  'Fifty',
+  'Sixty',
+  'Seventy',
+  'Eighty',
+  'Ninety',
+];
+
+function numberToWords(n) {
+  if (n === 0) return '';
+  if (n < 20) return NUM_ONES[n];
+  if (n < 100) return NUM_TENS[Math.floor(n / 10)] + (n % 10 ? ' ' + NUM_ONES[n % 10] : '');
+  if (n < 1000) {
+    const rem = n % 100;
+    return NUM_ONES[Math.floor(n / 100)] + ' Hundred' + (rem ? ' and ' + numberToWords(rem) : '');
+  }
+  if (n < 10000) {
+    const rem = n % 1000;
+    return NUM_ONES[Math.floor(n / 1000)] + ' Thousand' + (rem ? ' ' + numberToWords(rem) : '');
+  }
+  return String(n);
+}
+
+// "14 July 2003"
+function formatDateInWords(dateString) {
+  const date = new Date(dateString);
+  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+// "Fourteenth July Two Thousand Three"
+function formatDateFullWords(dateString) {
+  const date = new Date(dateString);
+  const day = DAY_ORDINALS[date.getDate()] || String(date.getDate());
+  const month = MONTHS[date.getMonth()];
+  const year = numberToWords(date.getFullYear());
+  return `${day} ${month} ${year}`;
+}
+
 // Build a variable map from a Student document for template auto-fill
 function buildAutoVars(student, fallbackName, fallbackUsn) {
   const today = new Date();
   const currentDate = today.toLocaleDateString('en-GB', {
-    day: 'numeric', month: 'long', year: 'numeric',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
   });
 
   if (!student) {
     const y = new Date().getFullYear();
     const ay = `${y}-${String(y + 1).slice(-2)}`;
     return {
-      student_name:  fallbackName,
-      name:          fallbackName,
-      usn:           fallbackUsn,
-      roll_no:       fallbackUsn,
-      roll_number:   fallbackUsn,
+      student_name: fallbackName,
+      name: fallbackName,
+      usn: fallbackUsn,
+      roll_no: fallbackUsn,
+      roll_number: fallbackUsn,
       academic_year: ay,
       accademic_year: ay,
-      batch:         ay,
-      current_date:  currentDate,
-      date:          currentDate,
-      place:         'Davanagere',
+      batch: ay,
+      current_date: currentDate,
+      date: currentDate,
+      place: 'Davanagere',
     };
   }
 
@@ -117,62 +240,101 @@ function buildAutoVars(student, fallbackName, fallbackUsn) {
     const base = (student.admissionCategory || '').toLowerCase() === 'lateral' ? 3 : 1;
     return Math.min(Math.max((new Date().getFullYear() - batchYear) * 2 + base, base), 8);
   };
-  const sem          = calcSem();
-  const semStr       = String(sem);
-  const semOrd       = ORDINALS[sem] ? `${ORDINALS[sem]} Semester` : `${sem}th Semester`;
-  const yearNum      = Math.ceil(sem / 2);                       // 1–4
-  const yearOrd      = YEAR_ORDINALS[yearNum] || `${yearNum}th`;
-  const yearLabel    = `${yearOrd} Year`;                        // "1st Year", "2nd Year" …
-  const studentName  = student.fullName || fallbackName;
-  const usnVal       = student.student_id || fallbackUsn;
-  const programName  = student.program || '';
-  const programCode  = getProgramCode(programName);              // "CSE", "ECE" …
-  const programFull  = getFullProgramName(programName);          // "Computer Science and Engineering" …
+  const sem = calcSem();
+  const semStr = String(sem);
+  const semOrd = ORDINALS[sem] ? `${ORDINALS[sem]} Semester` : `${sem}th Semester`;
+  const yearNum = Math.ceil(sem / 2); // 1–4
+  const yearOrd = YEAR_ORDINALS[yearNum] || `${yearNum}th`;
+  const yearLabel = `${yearOrd} Year`; // "1st Year", "2nd Year" …
+  const studentName = student.fullName || fallbackName;
+  const usnVal = student.student_id || fallbackUsn;
+  const programName = student.program || '';
+  const programCode = getProgramCode(programName); // "CSE", "ECE" …
+  const programFull = getFullProgramName(programName); // "Computer Science and Engineering" …
   // academic_year: use batch if set, else build from current calendar year
-  const academicYear = student.batch || (() => {
-    const y = new Date().getFullYear();
-    return `${y}-${String(y + 1).slice(-2)}`;
-  })();
+  const academicYear =
+    student.batch ||
+    (() => {
+      const y = new Date().getFullYear();
+      return `${y}-${String(y + 1).slice(-2)}`;
+    })();
 
   const vars = {
     // ── Student identity ───────────────────────────────────────────────────
-    student_name:      studentName,
-    name:              studentName,
-    usn:               usnVal,
-    roll_no:           usnVal,
-    roll_number:       usnVal,
-    father_name:       student.fatherName  || '',
-    email:             student.email       || '',
-    phone:             student.phone       || '',
-    address:           student.address     || '',
-    place:             student.address ? student.address.split(',').pop().trim() : 'Davanagere',
+    student_name: studentName,
+    name: studentName,
+    usn: usnVal,
+    roll_no: usnVal,
+    roll_number: usnVal,
+    father_name: student.fatherName || '',
+    email: student.email || '',
+    phone: student.phone || '',
+    address: student.address || '',
+    place: student.city || 'Davanagere',
 
     // ── Academic ───────────────────────────────────────────────────────────
-    program:           programCode,          // short code: "CSE", "ECE" …
-    program_full_name: programFull,          // "Computer Science and Engineering" …
-    branch:            programFull,          // alias → full name
-    department:        programFull,          // alias → full name
-    program_code:      programCode,          // explicit code alias
-    degree:            student.degree      || '',
-    batch:             student.batch       || academicYear,
-    academic_year:     academicYear,
-    accademic_year:    academicYear,         // common typo alias
+    program: programCode, // short code: "CSE", "ECE" …
+    program_full_name: programFull, // "Computer Science and Engineering" …
+    branch: programFull, // alias → full name
+    department: programFull, // alias → full name
+    program_code: programCode, // explicit code alias
+    degree: student.degree || '',
+    batch: student.batch || academicYear,
+    // Wrapped in nowrap span so "2022-23" doesn't break at the hyphen in PDF
+    academic_year: `<span style="white-space:nowrap">${academicYear}</span>`,
+    accademic_year: `<span style="white-space:nowrap">${academicYear}</span>`,
 
     // ── Term / semester / year ─────────────────────────────────────────────
-    semester:          semStr,               // "3"
-    sem:               semStr,               // alias
-    current_term:      semOrd,               // "3rd Semester"
-    year:              yearLabel,            // "2nd Year"  ← formatted
-    year_number:       String(yearNum),      // "2"  ← raw number
-    year_of_study:     yearLabel,            // "2nd Year"  (alias)
+    semester: semStr, // "3"
+    sem: semStr, // alias
+    current_term: semOrd, // "3rd Semester"
+    year: yearLabel, // "2nd Year"  ← formatted
+    year_number: String(yearNum), // "2"  ← raw number
+    year_of_study: yearLabel, // "2nd Year"  (alias)
+
+    // ── Personal details ──────────────────────────────────────────────────
+    gender: student.gender || '',
+    religion: student.religion || '',
+    caste: student.caste || '',
+    date_of_birth: student.dob ? formatDateInWords(student.dob) : '',
+    dob: student.dob ? formatDateInWords(student.dob) : '',
+    dob_in_words: student.dob ? formatDateFullWords(student.dob) : '',
+    date_of_birth_in_words: student.dob ? formatDateFullWords(student.dob) : '',
 
     // ── Status & dates ────────────────────────────────────────────────────
-    status:            student.admissionStatus || '',
-    current_date:      currentDate,
-    date:              currentDate,
+    status: student.admissionStatus || '',
+    current_date: currentDate,
+    date: currentDate,
+    date_of_admission: student.admissionDate
+      ? new Date(student.admissionDate).toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })
+      : '',
+    date_of_leaving_the_institute: student.lastJoiningDate
+      ? new Date(student.lastJoiningDate).toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })
+      : '',
   };
 
-  console.log('[Certificate] Vars built for', studentName, '| program:', programCode, '/', programFull, '| sem:', semStr, '| year:', yearLabel, '| academic_year:', academicYear);
+  console.log(
+    '[Certificate] Vars built for',
+    studentName,
+    '| program:',
+    programCode,
+    '/',
+    programFull,
+    '| sem:',
+    semStr,
+    '| year:',
+    yearLabel,
+    '| academic_year:',
+    academicYear
+  );
   return vars;
 }
 
@@ -203,11 +365,13 @@ async function checkEligibility(usn, certificateType) {
     $or: [{ student_id: usn }, { email: usn }],
     isDeleted: { $ne: true },
   });
-  if (!student) return [];  // unknown USN — don't block (may be manually issued)
+  if (!student) return []; // unknown USN — don't block (may be manually issued)
 
   const errors = [];
   if (student.admissionStatus !== 'Live') {
-    errors.push(`Student status is "${student.admissionStatus}" — only Live students can receive certificates`);
+    errors.push(
+      `Student status is "${student.admissionStatus}" — only Live students can receive certificates`
+    );
   }
   if (student.isDebarred) {
     errors.push('Student is debarred — certificates cannot be issued');
@@ -240,15 +404,18 @@ function syncFieldsFromNotes(notes, suppliedFields) {
   const keys = extractTemplateKeys(notes);
   if (keys.length === 0) return Array.isArray(suppliedFields) ? suppliedFields : [];
   const fieldMap = new Map((suppliedFields || []).map((f) => [f.key, f]));
-  return keys.map((key) => fieldMap.get(key) || {
-    name:     key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-    key,
-    type:     'text',
-    required: false,
-    editable: true,
-    regex:    '',
-    options:  [],
-  });
+  return keys.map(
+    (key) =>
+      fieldMap.get(key) || {
+        name: key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        key,
+        type: 'text',
+        required: false,
+        editable: true,
+        regex: '',
+        options: [],
+      }
+  );
 }
 
 // Add computed fieldCount (from content) to a plain template object
@@ -261,27 +428,41 @@ function withFieldCount(tmpl) {
 // GET /api/certificates/templates
 router.get('/templates', async (_req, res) => {
   try {
-    const docs = await CertificateTemplate.find().sort({ createdAt: -1 });
-    res.json({ success: true, data: docs.map(withFieldCount) });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+    const templates = await CertificateTemplate.find().sort({ createdAt: -1 });
+    res.json({
+      success: true,
+      data: (templates || []).map(withFieldCount),
+    });
+  } catch (err) {
+    console.error('TEMPLATES API ERROR:', err);
+    res.status(500).json({
+      success: false,
+      error: err.message || 'Internal server error',
+    });
+  }
 });
 
 // POST /api/certificates/templates
 router.post('/templates', async (req, res) => {
   try {
-    const { name, description, notes, fields, status, images } = req.body;
-    if (!name?.trim()) return res.status(400).json({ success: false, error: 'Template name is required' });
+    const { name, description, notes, fullHtml, fields, status, images } = req.body;
+    if (!name?.trim())
+      return res.status(400).json({ success: false, error: 'Template name is required' });
     const syncedFields = syncFieldsFromNotes(notes, fields);
     const tmpl = await CertificateTemplate.create({
-      name:        name.trim(),
+      name: name.trim(),
       description: description?.trim() || '',
-      notes:       notes  || '',
-      fields:      syncedFields,
-      images:      Array.isArray(images) ? images : [],
-      status:      status === 'LIVE' ? 'LIVE' : 'DRAFT',
+      notes: notes || '',
+      fullHtml: fullHtml || '',
+      fields: syncedFields,
+      images: Array.isArray(images) ? images : [],
+      status: status === 'LIVE' ? 'LIVE' : 'DRAFT',
     });
     res.status(201).json({ success: true, data: withFieldCount(tmpl) });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+  } catch (err) {
+    console.error('CREATE TEMPLATE API ERROR:', err);
+    res.status(500).json({ success: false, error: err.message || 'Internal server error' });
+  }
 });
 
 // GET /api/certificates/templates/:id
@@ -290,22 +471,86 @@ router.get('/templates/:id', async (req, res) => {
     const tmpl = await CertificateTemplate.findById(req.params.id);
     if (!tmpl) return res.status(404).json({ success: false, error: 'Template not found' });
     res.json({ success: true, data: withFieldCount(tmpl) });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+  } catch (err) {
+    console.error('GET TEMPLATE API ERROR:', err);
+    res.status(500).json({
+      success: false,
+      error: err.message || 'Internal server error',
+    });
+  }
 });
 
 // PUT /api/certificates/templates/:id
 router.put('/templates/:id', async (req, res) => {
   try {
-    const { name, description, notes, fields, status, images } = req.body;
+    const { name, description, notes, fullHtml, fields, status, images } = req.body;
     const syncedFields = syncFieldsFromNotes(notes, fields);
-    const tmpl = await CertificateTemplate.findByIdAndUpdate(
-      req.params.id,
-      { name, description, notes, fields: syncedFields, status, images: Array.isArray(images) ? images : [] },
-      { new: true, runValidators: true },
-    );
+    const updateData = {
+      name,
+      description,
+      notes,
+      fields: syncedFields,
+      status,
+      images: Array.isArray(images) ? images : [],
+    };
+    if (fullHtml !== undefined) updateData.fullHtml = fullHtml;
+    const tmpl = await CertificateTemplate.findByIdAndUpdate(req.params.id, updateData, {
+      new: true,
+      runValidators: true,
+    });
     if (!tmpl) return res.status(404).json({ success: false, error: 'Template not found' });
     res.json({ success: true, data: withFieldCount(tmpl) });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+  } catch (err) {
+    console.error('UPDATE TEMPLATE API ERROR:', err);
+    res.status(500).json({
+      success: false,
+      error: err.message || 'Internal server error',
+    });
+  }
+});
+
+// POST /api/certificates/templates/:id/image — upload an image for a template
+// Accepts multipart/form-data with field "image".
+// Stores the image as a base64 data URL inside template.images[].
+// Returns the new image entry so the frontend can use it immediately.
+router.post('/templates/:id/image', imageUpload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'No image file received. Send field name: "image".' });
+    }
+
+    const tmpl = await CertificateTemplate.findById(req.params.id);
+    if (!tmpl) return res.status(404).json({ success: false, error: 'Template not found' });
+
+    const base64 = req.file.buffer.toString('base64');
+    const dataUrl = `data:${req.file.mimetype};base64,${base64}`;
+
+    const newImage = {
+      id: `img_${Date.now()}`,
+      src: dataUrl,
+      pageIndex: 0,
+      x: 50,
+      y: 50,
+      width: 200,
+      height: 150,
+    };
+
+    tmpl.images = [...(tmpl.images || []), newImage];
+    await tmpl.save();
+
+    return res.status(201).json({
+      success: true,
+      image: newImage,
+      message: 'Image uploaded and added to template',
+    });
+  } catch (err) {
+    if (err.message?.includes('Only image files')) {
+      return res.status(400).json({ success: false, error: err.message });
+    }
+    return res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // DELETE /api/certificates/templates/:id
@@ -313,7 +558,10 @@ router.delete('/templates/:id', async (req, res) => {
   try {
     await CertificateTemplate.findByIdAndDelete(req.params.id);
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+  } catch (err) {
+    console.error('DELETE TEMPLATE API ERROR:', err);
+    res.status(500).json({ success: false, error: err.message || 'Internal server error' });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -324,20 +572,52 @@ router.delete('/templates/:id', async (req, res) => {
 router.get('/', async (_req, res) => {
   try {
     const filter = {};
-    if (_req.query.usn)          filter.usn         = _req.query.usn;
-    if (_req.query.studentName)  filter.studentName = new RegExp(_req.query.studentName, 'i');
-    const data = await Certificate.find(filter).populate('templateId', 'name').sort({ createdAt: -1 });
-    res.json({ success: true, data });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+    if (_req.query.usn) filter.usn = _req.query.usn;
+    if (_req.query.studentName) filter.studentName = new RegExp(_req.query.studentName, 'i');
+
+    const certificates = await Certificate.find(filter)
+      .populate({
+        path: 'templateId',
+        select: 'name',
+        strictPopulate: false,
+      })
+      .sort({ createdAt: -1 });
+
+    const safeCertificates = (certificates || []).map((c) => ({
+      _id: c._id,
+      studentName: c.studentName || 'Unknown',
+      usn: c.usn || 'N/A',
+      type: c.type || c.templateId?.name || 'Certificate',
+      status: c.status || 'Pending',
+      pdfBase64: c.pdfBase64 || null,
+      generatedAt: c.generatedAt || null,
+      requestedDate: c.requestedDate || null,
+      templateId: c.templateId || null,
+      createdAt: c.createdAt || null,
+      updatedAt: c.updatedAt || null,
+    }));
+
+    res.json({
+      success: true,
+      data: safeCertificates,
+    });
+  } catch (err) {
+    console.error('CERTIFICATES API ERROR:', err);
+    res.status(500).json({
+      success: false,
+      error: err.message || 'Internal server error',
+    });
+  }
 });
 
 // POST /api/certificates/issue  — template-based issue
 router.post('/issue', async (req, res) => {
   try {
     const { studentName, usn, templateId, fieldValues } = req.body;
-    if (!studentName?.trim()) return res.status(400).json({ success: false, error: 'Student name is required' });
-    if (!usn?.trim())         return res.status(400).json({ success: false, error: 'USN is required' });
-    if (!templateId)          return res.status(400).json({ success: false, error: 'Template is required' });
+    if (!studentName?.trim())
+      return res.status(400).json({ success: false, error: 'Student name is required' });
+    if (!usn?.trim()) return res.status(400).json({ success: false, error: 'USN is required' });
+    if (!templateId) return res.status(400).json({ success: false, error: 'Template is required' });
 
     const tmpl = await CertificateTemplate.findById(templateId);
     if (!tmpl) return res.status(404).json({ success: false, error: 'Template not found' });
@@ -345,7 +625,9 @@ router.post('/issue', async (req, res) => {
     // Eligibility gate
     const eligErrors = await checkEligibility(usn.trim(), tmpl.name);
     if (eligErrors.length > 0) {
-      return res.status(400).json({ success: false, error: 'Student is not eligible', eligibilityErrors: eligErrors });
+      return res
+        .status(400)
+        .json({ success: false, error: 'Student is not eligible', eligibilityErrors: eligErrors });
     }
 
     // Look up the student for auto-variable expansion
@@ -364,21 +646,24 @@ router.post('/issue', async (req, res) => {
       if (v !== '' && v !== null && v !== undefined) overrides[k] = v;
     }
     const valMap = { ...autoVars, ...overrides };
-    let   filledNotes = substituteVars(tmpl.notes || '', valMap);
+    let filledNotes = substituteVars(tmpl.notes || '', valMap);
 
     // Inject floating images (if any) as absolutely-positioned elements
     if (tmpl.images && tmpl.images.length > 0) {
-      const imgsHtml = tmpl.images.map((img) =>
-        `<img src="${img.src}" style="position:absolute;left:${img.x}px;top:${img.y}px;` +
-        `width:${img.width}px;height:${img.height}px;z-index:10;pointer-events:none;" />`
-      ).join('');
+      const imgsHtml = tmpl.images
+        .map(
+          (img) =>
+            `<img src="${img.src}" style="position:absolute;left:${img.x}px;top:${img.y}px;` +
+            `width:${img.width}px;height:${img.height}px;z-index:10;pointer-events:none;" />`
+        )
+        .join('');
       filledNotes = `<div style="position:relative;">${imgsHtml}${filledNotes}</div>`;
     }
 
     const cert = await Certificate.create({
       studentName: studentName.trim(),
-      usn:         usn.trim(),
-      type:        tmpl.name,
+      usn: usn.trim(),
+      type: tmpl.name,
       templateId,
       filledNotes,
       fieldValues: valMap,
@@ -386,226 +671,199 @@ router.post('/issue', async (req, res) => {
 
     // Auto-create Approval entry
     await Approval.create({
-      studentName:   cert.studentName,
-      usn:           cert.usn,
-      certificate:   cert.type,
+      studentName: cert.studentName,
+      usn: cert.usn,
+      certificate: cert.type,
       requestedDate: cert.requestedDate,
       certificateRef: cert._id,
     });
 
     res.status(201).json({ success: true, data: cert });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+  } catch (err) {
+    console.error('ISSUE API ERROR:', err);
+    res.status(500).json({ success: false, error: err.message || 'Internal server error' });
+  }
 });
 
 // POST /api/certificates/create  (legacy — kept for backward compatibility)
 router.post('/create', async (req, res) => {
   try {
     const { studentName, usn, type } = req.body;
-    if (!studentName?.trim()) return res.status(400).json({ success: false, error: 'Student name is required' });
-    if (!usn?.trim())         return res.status(400).json({ success: false, error: 'USN is required' });
-    if (!type)                return res.status(400).json({ success: false, error: 'Certificate type is required' });
+    if (!studentName?.trim())
+      return res.status(400).json({ success: false, error: 'Student name is required' });
+    if (!usn?.trim()) return res.status(400).json({ success: false, error: 'USN is required' });
+    if (!type)
+      return res.status(400).json({ success: false, error: 'Certificate type is required' });
 
     const eligErrors = await checkEligibility(usn.trim(), type);
     if (eligErrors.length > 0) {
-      return res.status(400).json({ success: false, error: 'Student is not eligible', eligibilityErrors: eligErrors });
+      return res
+        .status(400)
+        .json({ success: false, error: 'Student is not eligible', eligibilityErrors: eligErrors });
     }
 
-    const cert = await Certificate.create({ studentName: studentName.trim(), usn: usn.trim(), type });
+    const cert = await Certificate.create({
+      studentName: studentName.trim(),
+      usn: usn.trim(),
+      type,
+    });
 
     await Approval.create({
-      studentName:   cert.studentName,
-      usn:           cert.usn,
-      certificate:   cert.type,
+      studentName: cert.studentName,
+      usn: cert.usn,
+      certificate: cert.type,
       requestedDate: cert.requestedDate,
       certificateRef: cert._id,
     });
 
     res.status(201).json({ success: true, data: cert });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // PATCH /api/certificates/:id/approve
 router.patch('/:id/approve', async (req, res) => {
   try {
-    const cert = await Certificate.findByIdAndUpdate(
-      req.params.id, { status: 'Approved' }, { new: true }
-    );
+    let cert = await Certificate.findById(req.params.id);
     if (!cert) return res.status(404).json({ success: false, error: 'Certificate not found' });
+
+    cert.status = 'Approved';
+    cert = await cert.save();
+
+    // Update the associated approval document
     await Approval.findOneAndUpdate({ certificateRef: cert._id }, { status: 'Approved' });
+
+    console.log(
+      '[Puppeteer] Successfully updated certificate status to "Approved". (PDF will generate on download)'
+    );
     res.json({ success: true, data: cert });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+  } catch (err) {
+    console.error('APPROVE API ERROR:', err);
+    res.status(500).json({ success: false, error: err.message || 'Internal server error' });
+  }
 });
 
 // PATCH /api/certificates/:id/reject
 router.patch('/:id/reject', async (req, res) => {
   try {
     const cert = await Certificate.findByIdAndUpdate(
-      req.params.id, { status: 'Rejected' }, { new: true }
+      req.params.id,
+      { status: 'Rejected' },
+      { new: true }
     );
-    if (!cert) return res.status(404).json({ success: false, error: 'Certificate not found' });
     await Approval.findOneAndUpdate({ certificateRef: cert._id }, { status: 'Rejected' });
     res.json({ success: true, data: cert });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+  } catch (err) {
+    console.error('REJECT API ERROR:', err);
+    res.status(500).json({ success: false, error: err.message || 'Internal server error' });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  PDF GENERATION (Puppeteer — renders actual HTML/CSS)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Build the full certificate HTML page
-function buildCertHtml(cert, issuedOn) {
-  const body = cert.filledNotes
-    ? cert.filledNotes
-    : `<p>This is to certify that <strong>${cert.studentName}</strong> bearing University Seat Number (USN) <strong>${cert.usn}</strong> is a bonafide student of EduAdmin Institute.</p>`;
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<style>
-  @page { size: A4; margin: 0; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #1e293b; background: #fff; }
-
-  .header { background: #1D4ED8; color: #fff; padding: 22px 60px; text-align: center; }
-  .header .sys  { font-size: 9px; letter-spacing: 2px; opacity: .8; text-transform: uppercase; }
-  .header .inst { font-size: 21px; font-weight: 700; margin: 4px 0 2px; }
-  .header .aff  { font-size: 9px; opacity: .7; }
-
-  .body { padding: 32px 60px 40px; }
-
-  .cert-title { font-size: 20px; font-weight: 700; color: #1D4ED8; text-align: center;
-                text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
-  .divider { border: none; border-top: 2px solid #1D4ED8; margin: 0 20px 24px; }
-
-  .content { font-size: 12px; line-height: 1.75; }
-  .content h1 { font-size: 18px; font-weight: 700; margin: 14px 0 8px; }
-  .content h2 { font-size: 15px; font-weight: 600; margin: 12px 0 6px; }
-  .content p  { margin: 4px 0; }
-  .content ul, .content ol { padding-left: 22px; margin: 6px 0; }
-  .content li { margin: 2px 0; }
-  .content hr { border: none; border-top: 1px solid #cbd5e1; margin: 12px 0; }
-
-  /* Tables rendered exactly as in editor */
-  .content table { width: 100%; border-collapse: collapse; margin: 10px 0; table-layout: auto; }
-  .content td, .content th {
-    border: 1px solid #334155; padding: 6px 10px;
-    vertical-align: top; word-break: break-word; font-size: 11px;
-  }
-  .content th { background: #f1f5f9; font-weight: 600; }
-
-  .footer-date { margin-top: 20px; font-size: 11px; }
-  .footer-sig  { margin-top: 36px; text-align: right; }
-  .footer-sig .name { font-size: 12px; font-weight: 700; }
-  .footer-sig .sub  { font-size: 10px; color: #64748b; margin-top: 2px; }
-  .cert-id { margin-top: 28px; font-size: 8px; color: #94a3b8;
-             display: flex; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 6px; }
-</style>
-</head>
-<body>
-  <div class="header">
-    <div class="sys">Admission Management System</div>
-    <div class="inst">EduAdmin Institute</div>
-    <div class="aff">Approved by AICTE | Affiliated to VTU</div>
-  </div>
-  <div class="body">
-    <div class="cert-title">${cert.type}</div>
-    <hr class="divider">
-    <div class="content">${body}</div>
-    <div class="footer-date">Date of Issue: ${issuedOn}</div>
-    <div class="footer-sig">
-      <div class="name">Principal / Registrar</div>
-      <div class="sub">EduAdmin Institute</div>
-    </div>
-    <div class="cert-id">
-      <span>Certificate ID: ${cert._id}</span>
-      <span>Generated: ${issuedOn}</span>
-    </div>
-  </div>
-</body>
-</html>`;
-}
-
 // GET /api/certificates/pdf/:id
 router.get('/pdf/:id', async (req, res) => {
   let browser;
   try {
+    console.log('PDF API HIT', req.params.id);
+
     const cert = await Certificate.findById(req.params.id).populate('templateId');
     if (!cert) return res.status(404).json({ success: false, error: 'Certificate not found' });
 
-    // ── Status gate: Approved and Generated certificates may be downloaded ──
-    // Generated = previously downloaded (already approved); Approved = ready to download
     if (cert.status !== 'Approved' && cert.status !== 'Generated') {
       return res.status(403).json({
         success: false,
-        error: cert.status === 'Rejected'
-          ? 'This certificate has been rejected and cannot be downloaded.'
-          : 'Certificate is pending approval. Download is available once approved.',
+        error:
+          cert.status === 'Rejected'
+            ? 'This certificate has been rejected and cannot be downloaded.'
+            : 'Certificate is pending approval. Download is available once approved.',
       });
     }
 
-    // ── Always fetch the latest template and regenerate content ─────────────
-    // This ensures template edits are reflected immediately in every download.
-    const tmpl = (cert.templateId && cert.templateId._id)
-      ? cert.templateId                                           // already populated
-      : await CertificateTemplate.findOne({
-          $or: [
-            ...(cert.templateId ? [{ _id: cert.templateId }] : []),
-            { name: cert.type },
-          ],
-        });
-
-    if (tmpl) {
-      // Re-fetch the template as a plain doc to ensure we have the latest notes
-      const latestTmpl = await CertificateTemplate.findById(tmpl._id || tmpl);
-      if (latestTmpl) {
-        const studentDoc = await Student.findOne({
-          $or: [{ student_id: cert.usn }, { email: cert.usn }],
-          isDeleted: { $ne: true },
-        });
-        const vars = buildAutoVars(studentDoc, cert.studentName, cert.usn);
-        // Merge persisted fieldValues but never let empty strings overwrite computed vars
-        for (const [k, v] of Object.entries(cert.fieldValues || {})) {
-          if (v !== '' && v !== null && v !== undefined) vars[k] = v;
-        }
-        cert.filledNotes = substituteVars(latestTmpl.notes || '', vars);
-        console.log('[PDF] Using template:', latestTmpl.name, '| vars:', vars);
-      }
+    // Prefer fullHtml (Puppeteer-ready); fall back to notes wrapped in a shell
+    const tmpl = cert.templateId;
+    if (!tmpl) {
+      return res.status(400).json({
+        success: false,
+        error: 'PDF generation failed: Template not found. Please re-issue the certificate.',
+      });
     }
 
-    cert.generatedDate = new Date();
-    cert.status        = 'Generated';
-    await cert.save();
-    await Approval.findOneAndUpdate({ certificateRef: cert._id }, { status: 'Approved' });
-
-    // FALLBACK: Puppeteer removed for serverless compatibility
-    return res.status(200).json({ success: false, message: "Feature temporarily disabled" });
-
-    /*
-    const issuedOn = cert.generatedDate.toLocaleDateString('en-IN', {
-      day: 'numeric', month: 'long', year: 'numeric',
+    // 🔥 Get student data to fill variables live
+    const student = await Student.findOne({
+      $or: [{ student_id: cert.usn }, { email: cert.usn }],
+      isDeleted: { $ne: true },
     });
-    const html     = buildCertHtml(cert, issuedOn);
-    const filename = `${cert.type.replace(/\s+/g, '_')}_${cert.usn}.pdf`;
 
-    browser = await puppeteer.launch(await getLaunchOptions());
+    const vars = buildAutoVars(student, cert.studentName, cert.usn);
+    const htmlContent =
+      tmpl.fullHtml ||
+      buildCertHtml(
+        cert,
+        new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+      );
+    const finalHTML = substituteVars(htmlContent, vars);
+
+    // 🔥 Generate PDF using Puppeteer on-the-fly
+    const options = await getLaunchOptions();
+    browser = await puppeteer.launch(options);
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    const pdfBuffer = await page.pdf({
+
+    // Set viewport to exactly match the A4 page pixel dimensions used in the
+    // template editor (794 × 1123 @ 96 DPI).  Without this, Puppeteer uses its
+    // default 800 × 600 viewport, which can cause subtle scaling differences
+    // that shift absolute-positioned images relative to the text content.
+    await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1 });
+    // Override any stored template CSS that hard-clips content at 1123 px.
+    const fixedHTML = finalHTML.replace(
+      '</head>',
+      '<style>' +
+        'html,body{margin:0;padding:0;width:794px;font-family:Arial,sans-serif;}' +
+        '.page{width:794px!important;min-height:1123px!important;height:auto!important;overflow:visible!important;box-sizing:border-box!important;padding:40px 60px!important;page-break-after:auto!important;}' +
+        '.page:last-child{page-break-after:avoid!important;}' +
+        'p{margin:2px 0!important;line-height:1.3!important;}' +
+        'p,div,tr{page-break-inside:auto;}' +
+        '.no-break{page-break-inside:avoid!important;break-inside:avoid!important;}' +
+        '</style></head>'
+    );
+    await page.setContent(fixedHTML, { waitUntil: 'networkidle0' });
+
+    // page.pdf() returns Uint8Array in Puppeteer v21+, not a Buffer.
+    // Express res.send() only recognises Buffer — a Uint8Array is treated as
+    // a plain object and gets JSON-serialised as {"0":37,"1":80,...}.
+    // Buffer.from() wraps the Uint8Array into a proper Node.js Buffer.
+    const pdfRaw = await page.pdf({
       format: 'A4',
       printBackground: true,
-      margin: { top: '0', right: '0', bottom: '0', left: '0' },
+      scale: 0.92,
+      margin: { top: '0', bottom: '0', left: '0', right: '0' },
     });
+    const pdfBuffer = Buffer.isBuffer(pdfRaw) ? pdfRaw : Buffer.from(pdfRaw);
+
     await browser.close();
     browser = null;
 
+    const safeName = `${(cert.type || 'Certificate').replace(/\s+/g, '_')}_${cert.usn}.pdf`;
+
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.end(pdfBuffer);
-    */
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
   } catch (err) {
-    if (browser) { try { await browser.close(); } catch { /* ignore */ } }
-    if (!res.headersSent) res.status(500).json({ success: false, error: err.message });
+    console.error('PDF API ERROR:', err);
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, error: 'PDF generation failed: ' + err.message });
+    }
   }
 });
 
@@ -674,7 +932,7 @@ router.post('/templates/upload-pdf', pdfUpload.single('pdf'), async (req, res) =
     return res.status(400).json({ success: false, error: 'No PDF file received' });
   }
 
-  return res.status(200).json({ success: false, message: "Feature temporarily disabled" });
+  return res.status(200).json({ success: false, message: 'Feature temporarily disabled' });
 
   /*
   let pageCount = 1;

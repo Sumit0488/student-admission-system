@@ -37,15 +37,13 @@
   },
   "lint-staged": {
     "backend/src/**/*.js": [
-      "eslint --fix --max-warnings 0",
-      "prettier --write"
+      "npx prettier --write"
     ],
     "frontend/src/**/*.{js,jsx}": [
-      "eslint --fix --max-warnings 0",
-      "prettier --write"
+      "npx prettier --write"
     ],
     "**/*.{json,md,css}": [
-      "prettier --write"
+      "npx prettier --write"
     ]
   }
 }

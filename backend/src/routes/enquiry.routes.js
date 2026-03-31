@@ -1,13 +1,33 @@
-const express  = require('express');
-const router   = express.Router();
-const Enquiry  = require('../models/enquiry.model');
+const express = require('express');
+const router = express.Router();
+const Enquiry = require('../models/enquiry.model');
 const Schedule = require('../models/schedule.model');
-const Student  = require('../models/student.model');
+const Student = require('../models/student.model');
+
+// Extract degree from schedule name — mirrors schedule.routes.js logic
+function extractDegreeFromSchedule(schedule) {
+  if (!schedule) return '';
+  if (schedule.degree) return schedule.degree; // already stored
+  const name = schedule.scheduleName || '';
+  return name.trim().split(/\s+/)[0] || ''; // fallback: first word
+}
 
 // ── Required documents per admission category ────────────────────────────────
 const STD_DOCS = {
-  Regular: ['10th Certificate', 'PUC/12th Marks Card', 'Transfer Certificate', 'Aadhar Card', 'Passport Photo'],
-  Lateral: ['10th Certificate', 'Diploma Certificate', 'Transfer Certificate', 'Aadhar Card', 'Passport Photo'],
+  Regular: [
+    '10th Certificate',
+    'PUC/12th Marks Card',
+    'Transfer Certificate',
+    'Aadhar Card',
+    'Passport Photo',
+  ],
+  Lateral: [
+    '10th Certificate',
+    'Diploma Certificate',
+    'Transfer Certificate',
+    'Aadhar Card',
+    'Passport Photo',
+  ],
 };
 
 // ── Default term per admission category (matches ADMISSION_TYPE_MAP in schedule.routes.js)
@@ -19,7 +39,7 @@ const DEFAULT_YEAR = { Regular: 1, Lateral: 2 };
 // Both Regular and Lateral are always valid; the schedule config controls terms.
 function validateTerm(category, term, schedule) {
   if (!category || term === null || term === undefined) return null;
-  const key    = category.toLowerCase();
+  const key = category.toLowerCase();
   const config = schedule?.admissionType?.[key];
   // Only reject if allowedTerms are explicitly set AND the term is not in the list
   if (config?.allowedTerms?.length && !config.allowedTerms.includes(Number(term))) {
@@ -31,7 +51,7 @@ function validateTerm(category, term, schedule) {
 // ── Derive term from admissionCategory when not supplied ─────────────────────
 function resolveTermForCategory(category, schedule) {
   if (!category) return null;
-  const key    = category.toLowerCase();
+  const key = category.toLowerCase();
   const config = schedule?.admissionType?.[key];
   // Use schedule's allowedTerms[0] when configured, else fall back to defaults
   if (config?.allowedTerms?.length) return config.allowedTerms[0];
@@ -45,21 +65,28 @@ function resolveYearForCategory(category) {
 // ── GET /api/enquiry ──────────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
-    const { q = '', status = '', stream = '', interestLevel = '', scheduleId = '', admissionStage = '' } = req.query;
+    const {
+      q = '',
+      status = '',
+      stream = '',
+      interestLevel = '',
+      scheduleId = '',
+      admissionStage = '',
+    } = req.query;
     const filter = {};
 
     if (q.trim()) {
       filter.$or = [
-        { name:  { $regex: q, $options: 'i' } },
+        { name: { $regex: q, $options: 'i' } },
         { phone: { $regex: q, $options: 'i' } },
         { email: { $regex: q, $options: 'i' } },
-        { stream:{ $regex: q, $options: 'i' } },
+        { stream: { $regex: q, $options: 'i' } },
       ];
     }
-    if (status)        filter.status        = status;
-    if (stream)        filter.stream        = { $regex: stream, $options: 'i' };
+    if (status) filter.status = status;
+    if (stream) filter.stream = { $regex: stream, $options: 'i' };
     if (interestLevel) filter.interestLevel = interestLevel;
-    if (scheduleId)    filter.scheduleId    = scheduleId;
+    if (scheduleId) filter.scheduleId = scheduleId;
     if (admissionStage) filter.admissionStage = admissionStage;
 
     const data = await Enquiry.find(filter).sort({ createdAt: -1 });
@@ -75,7 +102,7 @@ router.post('/create', async (req, res) => {
     const { name, phone, email, stream, scheduleId } = req.body;
 
     // Required field validation
-    if (!name?.trim())  return res.status(400).json({ success: false, error: 'Name is required' });
+    if (!name?.trim()) return res.status(400).json({ success: false, error: 'Name is required' });
     if (!email?.trim()) return res.status(400).json({ success: false, error: 'Email is required' });
     if (!stream?.trim() && !scheduleId) {
       return res.status(400).json({ success: false, error: 'Stream is required' });
@@ -95,69 +122,69 @@ router.post('/create', async (req, res) => {
       email: email.trim(),
       stream: stream?.trim() || '',
       // programme & admission
-      program:           b.program          || '',
+      program: b.program || '',
       admissionCategory: b.admissionCategory || '',
-      term:              b.term !== null && b.term !== undefined ? Number(b.term) : null,
-      admissionDate:     b.admissionDate     || null,
-      admissionMode:     b.admissionMode     || '',
-      quota:             b.quota             || '',
-      seatNumber:        b.seatNumber        || '',
-      seatCategory:      b.seatCategory      || '',
-      kannada:           b.kannada           || '',
-      batch:             b.batch             || '',
+      term: b.term !== null && b.term !== undefined ? Number(b.term) : null,
+      admissionDate: b.admissionDate || null,
+      admissionMode: b.admissionMode || '',
+      quota: b.quota || '',
+      seatNumber: b.seatNumber || '',
+      seatCategory: b.seatCategory || '',
+      kannada: b.kannada || '',
+      batch: b.batch || '',
       // personal
-      gender:       b.gender       || '',
-      dob:          b.dob          || null,
-      aadhaar:      b.aadhaar      || '',
-      pan:          b.pan          || '',
-      bloodGroup:   b.bloodGroup   || '',
-      area:         b.area         || '',
+      gender: b.gender || '',
+      dob: b.dob || null,
+      aadhaar: b.aadhaar || '',
+      pan: b.pan || '',
+      bloodGroup: b.bloodGroup || '',
+      area: b.area || '',
       motherTongue: b.motherTongue || '',
-      religion:     b.religion     || '',
-      caste:        b.caste        || '',
-      subCaste:     b.subCaste     || '',
+      religion: b.religion || '',
+      caste: b.caste || '',
+      subCaste: b.subCaste || '',
       // entrance exam
-      examName:          b.examName          || '',
-      examRank:          b.examRank          ? Number(b.examRank)    : null,
-      hallTicketNo:      b.hallTicketNo      || '',
-      examYear:          b.examYear          ? Number(b.examYear)    : null,
-      admOrderDate:      b.admOrderDate      || null,
-      issuedDate:        b.issuedDate        || null,
-      allotmentDate:     b.allotmentDate     || null,
-      lastJoiningDate:   b.lastJoiningDate   || null,
-      claimedSeatCat:    b.claimedSeatCat    || '',
-      allotedSeatCat:    b.allotedSeatCat    || '',
-      admOrderNumber:    b.admOrderNumber    || '',
-      feePaid:           b.feePaid           ? Number(b.feePaid)     : null,
-      regNo:             b.regNo             || null,
+      examName: b.examName || '',
+      examRank: b.examRank ? Number(b.examRank) : null,
+      hallTicketNo: b.hallTicketNo || '',
+      examYear: b.examYear ? Number(b.examYear) : null,
+      admOrderDate: b.admOrderDate || null,
+      issuedDate: b.issuedDate || null,
+      allotmentDate: b.allotmentDate || null,
+      lastJoiningDate: b.lastJoiningDate || null,
+      claimedSeatCat: b.claimedSeatCat || '',
+      allotedSeatCat: b.allotedSeatCat || '',
+      admOrderNumber: b.admOrderNumber || '',
+      feePaid: b.feePaid ? Number(b.feePaid) : null,
+      regNo: b.regNo || null,
       prevQualification: b.prevQualification || '',
       // previous education
-      prevBoard:       b.prevBoard       || '',
-      prevCollege:     b.prevCollege     || '',
-      prevPercentage:  b.prevPercentage  ? Number(b.prevPercentage)  : null,
+      prevBoard: b.prevBoard || '',
+      prevCollege: b.prevCollege || '',
+      prevPercentage: b.prevPercentage ? Number(b.prevPercentage) : null,
       prevYearPassing: b.prevYearPassing ? Number(b.prevYearPassing) : null,
       // parents
-      fatherName:       b.fatherName       || '',
-      fatherContact:    b.fatherContact    || '',
+      fatherName: b.fatherName || '',
+      fatherContact: b.fatherContact || '',
       fatherOccupation: b.fatherOccupation || '',
-      fatherIncome:     b.fatherIncome     ? Number(b.fatherIncome)  : null,
-      fatherEmail:      b.fatherEmail      || '',
-      fatherPan:        b.fatherPan        || '',
-      motherName:       b.motherName       || '',
-      motherContact:    b.motherContact    || '',
+      fatherIncome: b.fatherIncome ? Number(b.fatherIncome) : null,
+      fatherEmail: b.fatherEmail || '',
+      fatherPan: b.fatherPan || '',
+      motherName: b.motherName || '',
+      motherContact: b.motherContact || '',
       motherOccupation: b.motherOccupation || '',
-      motherIncome:     b.motherIncome     ? Number(b.motherIncome)  : null,
-      motherEmail:      b.motherEmail      || '',
-      motherPan:        b.motherPan        || '',
+      motherIncome: b.motherIncome ? Number(b.motherIncome) : null,
+      motherEmail: b.motherEmail || '',
+      motherPan: b.motherPan || '',
       // address
       addressLine: b.addressLine || '',
-      city:        b.city        || '',
-      state:       b.state       || '',
-      pincode:     b.pincode     || '',
+      city: b.city || '',
+      state: b.state || '',
+      pincode: b.pincode || '',
       // misc
       interestLevel: b.interestLevel || '',
-      notes:         b.notes         || '',
-      documents:     b.documents     || [],
+      notes: b.notes || '',
+      documents: b.documents || [],
     };
 
     // Schedule-linked logic
@@ -182,22 +209,29 @@ router.post('/create', async (req, res) => {
       }
 
       // Auto-fill from schedule
-      payload.scheduleId   = scheduleId;
-      payload.stream       = schedule.scheduleName || schedule.stream;
+      payload.scheduleId = scheduleId;
+      payload.stream = schedule.scheduleName || schedule.stream;
       payload.academicYear = schedule.academicYear;
 
       // Atomically generate applicantId
       const updated = await Schedule.findByIdAndUpdate(
         scheduleId,
         { $inc: { applicantCount: 1 } },
-        { new: true },
+        { new: true }
       );
       payload.applicantId = `${updated.applicantPrefix}-${String(updated.applicantCount).padStart(4, '0')}`;
     }
 
     // Initialise documents from STD_DOCS when category is set and none provided
-    if (payload.admissionCategory && STD_DOCS[payload.admissionCategory] && !payload.documents.length) {
-      payload.documents = STD_DOCS[payload.admissionCategory].map((n) => ({ name: n, submitted: false }));
+    if (
+      payload.admissionCategory &&
+      STD_DOCS[payload.admissionCategory] &&
+      !payload.documents.length
+    ) {
+      payload.documents = STD_DOCS[payload.admissionCategory].map((n) => ({
+        name: n,
+        submitted: false,
+      }));
     }
 
     const enquiry = await Enquiry.create(payload);
@@ -216,7 +250,7 @@ router.post('/:id/followup', async (req, res) => {
     const enquiry = await Enquiry.findByIdAndUpdate(
       req.params.id,
       { $push: { followUps: { date: new Date(date), note, status } } },
-      { new: true },
+      { new: true }
     );
     if (!enquiry) return res.status(404).json({ success: false, error: 'Enquiry not found' });
     res.json({ success: true, data: enquiry });
@@ -228,7 +262,7 @@ router.post('/:id/followup', async (req, res) => {
 // ── POST /api/enquiry/convert/:id ─────────────────────────────────────────────
 router.post('/convert/:id', async (req, res) => {
   try {
-    const { force = false } = req.body; // allow bypassing doc check
+    const { force = false, degree: degreeOverride } = req.body; // allow bypassing doc check; degree override from UI
 
     const enquiry = await Enquiry.findById(req.params.id);
     if (!enquiry) return res.status(404).json({ success: false, error: 'Enquiry not found' });
@@ -237,16 +271,18 @@ router.post('/convert/:id', async (req, res) => {
     }
 
     let schedule = null;
-    let regNo    = null;
+    let regNo = null;
 
     if (enquiry.scheduleId) {
       schedule = await Schedule.findById(enquiry.scheduleId);
-      if (!schedule) return res.status(404).json({ success: false, error: 'Linked schedule not found' });
+      if (!schedule)
+        return res.status(404).json({ success: false, error: 'Linked schedule not found' });
 
       // Auto-assign term if enquiry has category but no term set
       if (enquiry.admissionCategory && (enquiry.term === null || enquiry.term === undefined)) {
         const autoTerm = resolveTermForCategory(enquiry.admissionCategory, schedule);
-        if (autoTerm !== null && autoTerm !== undefined) await Enquiry.findByIdAndUpdate(enquiry._id, { term: autoTerm });
+        if (autoTerm !== null && autoTerm !== undefined)
+          await Enquiry.findByIdAndUpdate(enquiry._id, { term: autoTerm });
         enquiry.term = autoTerm;
       }
 
@@ -275,50 +311,72 @@ router.post('/convert/:id', async (req, res) => {
         updated = await Schedule.findByIdAndUpdate(
           enquiry.scheduleId,
           { $inc: { filledSeats: 1 } },
-          { new: true },
+          { new: true }
         );
       } else {
         // Bounded seats — atomic check + increment
         updated = await Schedule.findOneAndUpdate(
           { _id: enquiry.scheduleId, $expr: { $lt: ['$filledSeats', '$maxSeats'] } },
           { $inc: { filledSeats: 1 } },
-          { new: true },
+          { new: true }
         );
         if (!updated) {
-          return res.status(400).json({ success: false, error: 'All seats are filled for this schedule' });
+          return res
+            .status(400)
+            .json({ success: false, error: 'All seats are filled for this schedule' });
         }
       }
       regNo = `${updated.regPrefix}-${String(updated.filledSeats).padStart(4, '0')}`;
     }
 
     // Build address string from enquiry fields
-    const addressParts = [enquiry.addressLine, enquiry.city, enquiry.state, enquiry.pincode].filter(Boolean);
+    const addressParts = [enquiry.addressLine, enquiry.city, enquiry.state, enquiry.pincode].filter(
+      Boolean
+    );
+
+    // Auto-generate college email from name so the student's Gmail stays as personalEmail
+    const nameSlug = enquiry.name
+      .toLowerCase()
+      .replace(/\s+/g, '.')
+      .replace(/[^a-z.]/g, '');
+    const autoEmail = `${nameSlug}.${Date.now()}@student.edu`;
 
     // Create student record with full details
     const student = await Student.create({
-      fullName:          enquiry.name,
-      email:             enquiry.email,
-      phone:             enquiry.phone,
-      program:           enquiry.program || enquiry.stream,
-      degree:            schedule?.degree || '',
-      batch:             enquiry.batch   || enquiry.academicYear || '',
-      term:              enquiry.term    ?? null,
+      fullName: enquiry.name,
+      email: autoEmail, // college email — auto-generated
+      personalEmail: enquiry.email || '', // student's Gmail / personal email
+      phone: enquiry.phone,
+      program: enquiry.program || enquiry.stream,
+      degree: degreeOverride?.trim() || extractDegreeFromSchedule(schedule) || null,
+      batch: enquiry.batch || enquiry.academicYear || '',
+      term: enquiry.term ?? null,
       admissionCategory: enquiry.admissionCategory || '',
-      admissionStatus:   'Live',
-      address:           addressParts.join(', ') || '',
+      admissionStatus: 'Live',
+      address: addressParts.join(', ') || '',
+      // Personal details from enquiry — used in certificate generation
+      gender: enquiry.gender || '',
+      dob: enquiry.dob || null,
+      religion: enquiry.religion || '',
+      caste: enquiry.caste || '',
+      fatherName: enquiry.fatherName || '',
+      admissionDate: enquiry.admissionDate || null,
+      lastJoiningDate: enquiry.lastJoiningDate || null,
     });
 
     // Update enquiry
-    enquiry.status             = 'Converted';
-    enquiry.admissionStage     = 'Admitted';
+    enquiry.status = 'Converted';
+    enquiry.admissionStage = 'Admitted';
     enquiry.convertedStudentId = student.student_id;
-    if (regNo) enquiry.regNo   = regNo;
+    if (regNo) enquiry.regNo = regNo;
     await enquiry.save();
 
     res.status(201).json({ success: true, data: { enquiry, student } });
   } catch (err) {
     if (err.code === 11000) {
-      return res.status(400).json({ success: false, error: 'A student with this email already exists' });
+      return res
+        .status(400)
+        .json({ success: false, error: 'A student with this email already exists' });
     }
     res.status(500).json({ success: false, error: err.message });
   }
@@ -329,30 +387,82 @@ router.put('/:id', async (req, res) => {
   try {
     const ALLOWED = [
       // core
-      'status', 'admissionStage', 'interestLevel', 'notes',
-      'name', 'phone', 'email', 'stream', 'academicYear', 'batch',
+      'status',
+      'admissionStage',
+      'interestLevel',
+      'notes',
+      'name',
+      'phone',
+      'email',
+      'stream',
+      'academicYear',
+      'batch',
       // programme & admission
-      'program', 'admissionCategory', 'term',
-      'admissionDate', 'admissionMode', 'quota', 'seatNumber', 'seatCategory', 'kannada',
+      'program',
+      'admissionCategory',
+      'term',
+      'admissionDate',
+      'admissionMode',
+      'quota',
+      'seatNumber',
+      'seatCategory',
+      'kannada',
       // personal
-      'gender', 'dob', 'aadhaar', 'pan', 'bloodGroup', 'area', 'motherTongue',
-      'religion', 'caste', 'subCaste',
+      'gender',
+      'dob',
+      'aadhaar',
+      'pan',
+      'bloodGroup',
+      'area',
+      'motherTongue',
+      'religion',
+      'caste',
+      'subCaste',
       // entrance exam
-      'examName', 'examRank', 'hallTicketNo', 'examYear',
-      'admOrderDate', 'issuedDate', 'allotmentDate', 'lastJoiningDate',
-      'claimedSeatCat', 'allotedSeatCat', 'admOrderNumber', 'feePaid', 'regNo', 'prevQualification',
+      'examName',
+      'examRank',
+      'hallTicketNo',
+      'examYear',
+      'admOrderDate',
+      'issuedDate',
+      'allotmentDate',
+      'lastJoiningDate',
+      'claimedSeatCat',
+      'allotedSeatCat',
+      'admOrderNumber',
+      'feePaid',
+      'regNo',
+      'prevQualification',
       // previous education
-      'prevBoard', 'prevCollege', 'prevPercentage', 'prevYearPassing',
+      'prevBoard',
+      'prevCollege',
+      'prevPercentage',
+      'prevYearPassing',
       // parents
-      'fatherName', 'fatherContact', 'fatherOccupation', 'fatherIncome', 'fatherEmail', 'fatherPan',
-      'motherName', 'motherContact', 'motherOccupation', 'motherIncome', 'motherEmail', 'motherPan',
+      'fatherName',
+      'fatherContact',
+      'fatherOccupation',
+      'fatherIncome',
+      'fatherEmail',
+      'fatherPan',
+      'motherName',
+      'motherContact',
+      'motherOccupation',
+      'motherIncome',
+      'motherEmail',
+      'motherPan',
       // address
-      'addressLine', 'city', 'state', 'pincode',
+      'addressLine',
+      'city',
+      'state',
+      'pincode',
       // documents
       'documents',
     ];
     const update = {};
-    ALLOWED.forEach((f) => { if (req.body[f] !== undefined) update[f] = req.body[f]; });
+    ALLOWED.forEach((f) => {
+      if (req.body[f] !== undefined) update[f] = req.body[f];
+    });
 
     // Auto-assign term from admissionCategory when not explicitly provided
     if (update.admissionCategory && (update.term === null || update.term === undefined)) {
@@ -364,7 +474,8 @@ router.put('/:id', async (req, res) => {
           update.year_of_study = resolveYearForCategory(update.admissionCategory);
         }
       }
-      if (update.term === null || update.term === undefined) update.term = DEFAULT_TERM[update.admissionCategory] ?? null;
+      if (update.term === null || update.term === undefined)
+        update.term = DEFAULT_TERM[update.admissionCategory] ?? null;
     }
 
     // Term validation if schedule linked (only checks allowedTerms, not enabled flag)
@@ -382,12 +493,22 @@ router.put('/:id', async (req, res) => {
     // When admissionCategory changes, init documents if currently empty
     if (update.admissionCategory && STD_DOCS[update.admissionCategory]) {
       const existing = await Enquiry.findById(req.params.id).select('documents admissionCategory');
-      if (existing && existing.admissionCategory !== update.admissionCategory && existing.documents.length === 0) {
-        update.documents = STD_DOCS[update.admissionCategory].map((name) => ({ name, submitted: false }));
+      if (
+        existing &&
+        existing.admissionCategory !== update.admissionCategory &&
+        existing.documents.length === 0
+      ) {
+        update.documents = STD_DOCS[update.admissionCategory].map((name) => ({
+          name,
+          submitted: false,
+        }));
       }
     }
 
-    const enquiry = await Enquiry.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
+    const enquiry = await Enquiry.findByIdAndUpdate(req.params.id, update, {
+      new: true,
+      runValidators: true,
+    });
     if (!enquiry) return res.status(404).json({ success: false, error: 'Enquiry not found' });
     res.json({ success: true, data: enquiry });
   } catch (err) {
