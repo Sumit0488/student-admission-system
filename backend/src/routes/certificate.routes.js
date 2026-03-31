@@ -2,14 +2,13 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 // const pdfParse             = require('pdf-parse');
-const { createWorker } = require('tesseract.js');
-const puppeteer = require('puppeteer-core');
-const chromium = require('@sparticuz/chromium-min');
 const CHROMIUM_URL =
   'https://github.com/Sparticuz/chromium/releases/download/v143.0.0/chromium-v143.0.0-pack.tar';
 
+// Lazy-load heavy PDF deps — prevents startup crash if not installed
 async function getLaunchOptions() {
   if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+    const chromium = require('@sparticuz/chromium-min');
     return {
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
@@ -17,7 +16,6 @@ async function getLaunchOptions() {
       headless: chromium.headless,
     };
   }
-  // Local dev — use the Chromium that puppeteer downloaded
   const localPuppeteer = require('puppeteer');
   return {
     executablePath: localPuppeteer.executablePath(),
@@ -809,6 +807,7 @@ router.get('/pdf/:id', async (req, res) => {
 
     // 🔥 Generate PDF using Puppeteer on-the-fly
     const options = await getLaunchOptions();
+    const puppeteer = require('puppeteer-core');
     browser = await puppeteer.launch(options);
     const page = await browser.newPage();
 
@@ -955,6 +954,7 @@ router.post('/templates/upload-pdf', pdfUpload.single('pdf'), async (req, res) =
     usedOcr = true;
     let worker;
     try {
+      const { createWorker } = require('tesseract.js');
       worker = await createWorker('eng');
       // Pass the PDF buffer directly; Tesseract will attempt to recognise it.
       // Works best when the PDF wraps a single JPEG/PNG image.
