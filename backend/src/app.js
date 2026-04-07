@@ -14,17 +14,27 @@ const authRoutes = require('./routes/auth.routes');
 const { softAuth } = require('./middleware/auth');
 const { globalErrorHandler } = require('./utils/errorHandler');
 
+const ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
 const CORS_OPTS = {
-  origin: [
-    'http://localhost:3000', // Zudient student frontend
-    'http://localhost:3001', // Zudient admin app
-    'http://localhost:5173', // Admission admin frontend (default Vite port)
-    'http://localhost:5174',
-    'http://localhost:5175',
-    process.env.FRONTEND_URL,
-  ].filter(Boolean),
+  origin: function (origin, callback) {
+    // Allow requests with no origin (curl, mobile apps, server-to-server)
+    if (!origin) return callback(null, true);
+    // Allow any *.vercel.app subdomain (covers all preview + production deployments)
+    if (origin.endsWith('.vercel.app') || ALLOWED_ORIGINS.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
-  exposedHeaders: ['Content-Disposition'], // allow browser to read filename
+  exposedHeaders: ['Content-Disposition'],
 };
 
 // Allow max 100 requests per IP per minute across all API routes

@@ -1,6 +1,6 @@
 {
-  "installCommand": "npm install",
-  "buildCommand": "",
+  "installCommand": "npm install && npm install --prefix backend",
+  "buildCommand": "npm install --prefix frontend && npm run build --prefix frontend",
   "outputDirectory": "frontend/dist",
   "env": {
     "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
@@ -8,7 +8,8 @@
   },
   "functions": {
     "api/[...path].js": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "memory": 1024
     }
   },
   "rewrites": [
