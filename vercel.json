@@ -1,6 +1,6 @@
 {
   "installCommand": "npm install && npm install --prefix backend",
-  "buildCommand": "cd frontend && npm install && npm run build",
+  "buildCommand": "",
   "outputDirectory": "frontend/dist",
   "env": {
     "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
