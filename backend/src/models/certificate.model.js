@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const certificateSchema = new mongoose.Schema(
   {
+    tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', index: true, default: null },
     studentName: { type: String, required: true, trim: true },
     usn: { type: String, required: true, trim: true },
     type: { type: String, required: true }, // free-form — driven by template name

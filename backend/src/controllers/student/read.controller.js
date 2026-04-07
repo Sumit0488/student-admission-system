@@ -1,5 +1,5 @@
 const studentService = require('../../services/student.service');
-const handleError     = require('./handleError');
+const handleError = require('./handleError');
 
 // ─── READ ALL  GET /api/students?q=&program=&batch=&status=&page=&limit= ──────
 const getStudents = async (req, res) => {
@@ -7,21 +7,28 @@ const getStudents = async (req, res) => {
   console.log('GET STUDENTS API HIT');
   console.log('GET /api/students  |  Query:', req.query);
   try {
-    const result = await studentService.getStudents(req.query);
+    const result = await studentService.getStudents(req.query, req.tenantId);
     console.log(`✅ Found ${result.students.length} / ${result.total} student(s)`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    return res.json({ success: true, action: 'READ', data: result.students, total: result.total, page: result.page, limit: result.limit });
+    return res.json({
+      success: true,
+      action: 'READ',
+      data: result.students,
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+    });
   } catch (err) {
     return handleError(err, res, 'READ');
   }
 };
 
 // ─── STATUS COUNTS  GET /api/students/counts ──────────────────────────────────
-const getStatusCounts = async (_req, res) => {
+const getStatusCounts = async (req, res) => {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('GET STATUS COUNTS API HIT');
   try {
-    const counts = await studentService.getStatusCounts();
+    const counts = await studentService.getStatusCounts(req.tenantId);
     console.log('✅ Counts:', counts);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return res.json({ success: true, action: 'COUNTS', data: counts });
@@ -52,7 +59,7 @@ const searchStudents = async (req, res) => {
   console.log('SEARCH STUDENTS API HIT');
   console.log('GET /api/students/search  |  Query:', query);
   try {
-    const data = await studentService.searchStudents(query);
+    const data = await studentService.searchStudents(query, req.tenantId);
     console.log(`✅ Search returned ${data.length} result(s)`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return res.json({ success: true, action: 'SEARCH', data });
@@ -69,7 +76,7 @@ const exportStudents = async (req, res) => {
   console.log('EXPORT STUDENTS API HIT');
   console.log('GET /api/students/export  |  Query:', req.query);
   try {
-    const rows = await studentService.exportStudents(req.query);
+    const rows = await studentService.exportStudents(req.query, req.tenantId);
 
     if (rows.length === 0) {
       return res.status(404).json({
@@ -81,26 +88,26 @@ const exportStudents = async (req, res) => {
     }
 
     // ── Build Excel workbook ───────────────────────────────────────────────────
-    const workbook  = new ExcelJS.Workbook();
-    workbook.creator  = 'Student Admission System';
-    workbook.created  = new Date();
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Student Admission System';
+    workbook.created = new Date();
 
     const sheet = workbook.addWorksheet('Students');
 
     // Column definitions — width tuned to typical content lengths
     sheet.columns = [
-      { header: 'USN',           key: 'usn',   width: 24 },
-      { header: 'Student Name',  key: 'name',  width: 28 },
+      { header: 'USN', key: 'usn', width: 24 },
+      { header: 'Student Name', key: 'name', width: 28 },
       { header: 'Student Email', key: 'email', width: 36 },
     ];
 
     // ── Style the header row ───────────────────────────────────────────────────
     const headerRow = sheet.getRow(1);
     headerRow.eachCell((cell, colNumber) => {
-      cell.font      = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
-      cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } }; // blue-700
+      cell.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } }; // blue-700
       cell.alignment = { vertical: 'middle', horizontal: colNumber === 1 ? 'center' : 'left' };
-      cell.border    = {
+      cell.border = {
         bottom: { style: 'medium', color: { argb: 'FF1E40AF' } },
       };
     });
@@ -108,7 +115,7 @@ const exportStudents = async (req, res) => {
 
     // ── Add data rows ──────────────────────────────────────────────────────────
     rows.forEach((r, i) => {
-      const row    = sheet.addRow({ usn: r.usn, name: r.name, email: r.email });
+      const row = sheet.addRow({ usn: r.usn, name: r.name, email: r.email });
       const isEven = i % 2 === 1;
 
       row.eachCell((cell, colNumber) => {
@@ -127,9 +134,7 @@ const exportStudents = async (req, res) => {
     sheet.views = [{ state: 'frozen', ySplit: 1 }];
 
     // ── File name: students_CSE_live.xlsx  or  students_all_live.xlsx ─────────
-    const branch   = req.query.program
-      ? req.query.program.replace(/[^a-zA-Z0-9]/g, '_')
-      : 'all';
+    const branch = req.query.program ? req.query.program.replace(/[^a-zA-Z0-9]/g, '_') : 'all';
     const filename = `students_${branch}_live.xlsx`;
 
     console.log(`✅ Exporting ${rows.length} student(s) → ${filename}`);
@@ -137,7 +142,7 @@ const exportStudents = async (req, res) => {
 
     res.setHeader(
       'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     );
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
@@ -151,17 +156,17 @@ const exportStudents = async (req, res) => {
 
 // ─── FULL REPORT  GET /api/students/export/report ────────────────────────────
 const STATUS_COLORS = {
-  Live:      { header: 'FF16A34A', stripe: 'FFF0FDF4' }, // green
+  Live: { header: 'FF16A34A', stripe: 'FFF0FDF4' }, // green
   Completed: { header: 'FF1D4ED8', stripe: 'FFF0F9FF' }, // blue
   Cancelled: { header: 'FFDC2626', stripe: 'FFFEF2F2' }, // red
-  Detained:  { header: 'FFD97706', stripe: 'FFFEFCE8' }, // amber
+  Detained: { header: 'FFD97706', stripe: 'FFFEFCE8' }, // amber
 };
 
-const exportFullReport = async (_req, res) => {
+const exportFullReport = async (req, res) => {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('EXPORT FULL REPORT API HIT');
   try {
-    const { groups, total } = await studentService.exportFullReport();
+    const { groups, total } = await studentService.exportFullReport(req.tenantId);
 
     if (total === 0) {
       return res.status(404).json({ success: false, error: 'No students found in the database.' });
@@ -175,10 +180,10 @@ const exportFullReport = async (_req, res) => {
     const styleHeader = (row, headerArgb) => {
       row.height = 20;
       row.eachCell((cell) => {
-        cell.font      = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
-        cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerArgb } };
+        cell.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerArgb } };
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
-        cell.border    = { bottom: { style: 'medium', color: { argb: headerArgb } } };
+        cell.border = { bottom: { style: 'medium', color: { argb: headerArgb } } };
       });
     };
 
@@ -187,7 +192,8 @@ const exportFullReport = async (_req, res) => {
       row.height = 18;
       row.eachCell((cell, col) => {
         cell.alignment = { vertical: 'middle', horizontal: col === 1 ? 'center' : 'left' };
-        if (isEven) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: stripeArgb } };
+        if (isEven)
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: stripeArgb } };
         cell.border = { bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } } };
       });
     };
@@ -195,17 +201,17 @@ const exportFullReport = async (_req, res) => {
     // ── Sheet 1: Overview summary ──────────────────────────────────────────────
     const overview = workbook.addWorksheet('Overview');
     overview.columns = [
-      { header: 'Status',     key: 'status',  width: 16 },
-      { header: 'Students',   key: 'count',   width: 12 },
+      { header: 'Status', key: 'status', width: 16 },
+      { header: 'Students', key: 'count', width: 12 },
       { header: '% of Total', key: 'percent', width: 14 },
     ];
     styleHeader(overview.getRow(1), 'FF334155'); // slate-700
 
     const statuses = ['Live', 'Completed', 'Cancelled', 'Detained'];
     statuses.forEach((s, i) => {
-      const count   = groups[s].length;
+      const count = groups[s].length;
       const percent = total > 0 ? ((count / total) * 100).toFixed(1) + '%' : '0%';
-      const row     = overview.addRow({ status: s, count, percent });
+      const row = overview.addRow({ status: s, count, percent });
       styleDataRow(row, i % 2 === 1, 'FFF8FAFC');
       // Colour the status cell to match its sheet
       row.getCell(1).font = { bold: true, color: { argb: STATUS_COLORS[s].header } };
@@ -215,33 +221,40 @@ const exportFullReport = async (_req, res) => {
     const totalsRow = overview.addRow({ status: 'Total', count: total, percent: '100%' });
     totalsRow.height = 18;
     totalsRow.eachCell((cell) => {
-      cell.font      = { bold: true, size: 11 };
-      cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      cell.font = { bold: true, size: 11 };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
       cell.alignment = { vertical: 'middle', horizontal: 'center' };
-      cell.border    = { top: { style: 'medium', color: { argb: 'FF94A3B8' } } };
+      cell.border = { top: { style: 'medium', color: { argb: 'FF94A3B8' } } };
     });
 
     overview.views = [{ state: 'frozen', ySplit: 1 }];
 
     // ── Sheets 2–5: one per status ─────────────────────────────────────────────
     statuses.forEach((status) => {
-      const rows  = groups[status];
+      const rows = groups[status];
       const color = STATUS_COLORS[status];
       const sheet = workbook.addWorksheet(status);
 
       sheet.columns = [
-        { header: 'USN',          key: 'usn',      width: 24 },
-        { header: 'Student Name', key: 'name',     width: 28 },
-        { header: 'Email',        key: 'email',    width: 34 },
-        { header: 'Program',      key: 'program',  width: 22 },
-        { header: 'Batch',        key: 'batch',    width: 14 },
-        { header: 'Semester',     key: 'semester', width: 10 },
+        { header: 'USN', key: 'usn', width: 24 },
+        { header: 'Student Name', key: 'name', width: 28 },
+        { header: 'Email', key: 'email', width: 34 },
+        { header: 'Program', key: 'program', width: 22 },
+        { header: 'Batch', key: 'batch', width: 14 },
+        { header: 'Semester', key: 'semester', width: 10 },
       ];
 
       styleHeader(sheet.getRow(1), color.header);
 
       if (rows.length === 0) {
-        const empty = sheet.addRow({ usn: 'No students in this category', name: '', email: '', program: '', batch: '', semester: '' });
+        const empty = sheet.addRow({
+          usn: 'No students in this category',
+          name: '',
+          email: '',
+          program: '',
+          batch: '',
+          semester: '',
+        });
         empty.getCell(1).font = { italic: true, color: { argb: 'FF94A3B8' } };
         sheet.mergeCells(`A2:F2`);
       } else {
@@ -259,13 +272,18 @@ const exportFullReport = async (_req, res) => {
     });
 
     // ── File name & headers ────────────────────────────────────────────────────
-    const date     = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     const filename = `students_full_report_${date}.xlsx`;
 
-    console.log(`✅ Full report: ${total} student(s) across ${statuses.length} sheets → ${filename}`);
+    console.log(
+      `✅ Full report: ${total} student(s) across ${statuses.length} sheets → ${filename}`
+    );
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     await workbook.xlsx.write(res);
     return res.end();
@@ -284,4 +302,12 @@ const getDistinctPrograms = async (_req, res) => {
   }
 };
 
-module.exports = { getStudents, getStatusCounts, getStudentById, searchStudents, exportStudents, exportFullReport, getDistinctPrograms };
+module.exports = {
+  getStudents,
+  getStatusCounts,
+  getStudentById,
+  searchStudents,
+  exportStudents,
+  exportFullReport,
+  getDistinctPrograms,
+};

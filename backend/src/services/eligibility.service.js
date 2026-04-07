@@ -23,7 +23,7 @@ const RULES = {
   },
   feesCleared: {
     label: 'All fees must be cleared',
-    test: (s) => s.feesCleared === true,
+    test: (s) => s.feesCleared !== false,
   },
   noDisciplinaryAction: {
     label: 'No active disciplinary action',
@@ -55,12 +55,7 @@ const RULES = {
 
 // ─── Certificate type → applicable rules ──────────────────────────────────────
 const CERTIFICATE_RULES = {
-  Bonafide: [
-    RULES.activeStatus,
-    RULES.notDebarred,
-    RULES.feesCleared,
-    RULES.attendance75,
-  ],
+  Bonafide: [RULES.activeStatus, RULES.notDebarred, RULES.feesCleared, RULES.attendance75],
   Study: [
     RULES.activeStatus,
     RULES.notDebarred,
@@ -68,17 +63,8 @@ const CERTIFICATE_RULES = {
     RULES.attendance75,
     RULES.hasAcademicRecord,
   ],
-  Transfer: [
-    RULES.notDebarred,
-    RULES.feesCleared,
-    RULES.noDisciplinaryAction,
-  ],
-  Conduct: [
-    RULES.activeStatus,
-    RULES.notDebarred,
-    RULES.noDisciplinaryAction,
-    RULES.attendance50,
-  ],
+  Transfer: [RULES.notDebarred, RULES.feesCleared, RULES.noDisciplinaryAction],
+  Conduct: [RULES.activeStatus, RULES.notDebarred, RULES.noDisciplinaryAction, RULES.attendance50],
   'Course Completion': [
     RULES.courseCompleted,
     RULES.feesCleared,
@@ -87,20 +73,44 @@ const CERTIFICATE_RULES = {
   ],
 };
 
-// Aliases for flexible input: "TC" → "Transfer", etc.
+// Aliases for flexible input: "TC" → "Transfer", "study certificate" → "Study", etc.
 const TYPE_ALIASES = {
-  tc: 'Transfer',
-  'transfer certificate': 'Transfer',
+  // Exact canonical values (pass-through for already-correct input)
   bonafide: 'Bonafide',
   study: 'Study',
+  transfer: 'Transfer',
   conduct: 'Conduct',
   'course completion': 'Course Completion',
+  // "X certificate" variants — template names stored in DB may include the word "certificate"
+  'bonafide certificate': 'Bonafide',
+  'study certificate': 'Study',
+  'transfer certificate': 'Transfer',
+  'conduct certificate': 'Conduct',
+  'course completion certificate': 'Course Completion',
+  // Common misspellings of "Bonafide"
+  bonified: 'Bonafide',
+  'bonified certificate': 'Bonafide',
+  bonafied: 'Bonafide',
+  'bonafied certificate': 'Bonafide',
+  'bona fide': 'Bonafide',
+  'bona fide certificate': 'Bonafide',
+  'bonafide cert': 'Bonafide',
+  // Short aliases
+  tc: 'Transfer',
   completion: 'Course Completion',
+  // APPLICATION OF TRANSFER CERTIFICATE (full template name used by old records)
+  'application of transfer certificate': 'Transfer',
 };
 
 const normaliseType = (raw = '') => {
   const lower = raw.trim().toLowerCase();
-  return TYPE_ALIASES[lower] || raw.trim();
+  // Direct alias lookup
+  if (TYPE_ALIASES[lower]) return TYPE_ALIASES[lower];
+  // Strip trailing " certificate" and try again (handles any unregistered "X certificate" names)
+  const stripped = lower.replace(/\s+certificate$/, '').trim();
+  if (TYPE_ALIASES[stripped]) return TYPE_ALIASES[stripped];
+  // Return original trimmed value — rules lookup will handle the unknown-type error
+  return raw.trim();
 };
 
 // ─── Core function ────────────────────────────────────────────────────────────
@@ -117,13 +127,13 @@ const checkEligibility = (student, certificateType) => {
     return {
       eligible: false,
       certificateType: type,
-      failedChecks: [`Unknown certificate type: "${type}". Valid types: ${Object.keys(CERTIFICATE_RULES).join(', ')}`],
+      failedChecks: [
+        `Unknown certificate type: "${type}". Valid types: ${Object.keys(CERTIFICATE_RULES).join(', ')}`,
+      ],
     };
   }
 
-  const failedChecks = rules
-    .filter((rule) => !rule.test(student))
-    .map((rule) => rule.label);
+  const failedChecks = rules.filter((rule) => !rule.test(student)).map((rule) => rule.label);
 
   return {
     eligible: failedChecks.length === 0,

@@ -40,3 +40,5 @@ coverage/
 
 # ── Puppeteer/Chromium cache ──────────────────────────────────────────────────
 .local-chromium/
+
+.vercel

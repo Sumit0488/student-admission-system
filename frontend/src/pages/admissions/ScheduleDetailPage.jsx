@@ -168,6 +168,28 @@ function getTermForCategory(category, schedule) {
   return null;
 }
 
+// ── Dynamic current-term calculation (mirrors backend calculateTerm) ──────────
+// batch format: "2022-23" | category: "Regular" | "Lateral"
+// Indian academic year: Aug–Jul (semester 1 = Aug–Jan, semester 2 = Feb–Jul)
+function calcCurrentTerm(batch, admissionCategory) {
+  if (!batch) return null;
+  const batchYear = parseInt((batch || '').split('-')[0], 10);
+  if (isNaN(batchYear)) return null;
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // 1-12
+
+  const academicStartYear = currentMonth >= 8 ? currentYear : currentYear - 1;
+  const yearsElapsed = academicStartYear - batchYear;
+  if (yearsElapsed < 0) return null;
+
+  const semesterOffset = currentMonth >= 2 && currentMonth <= 7 ? 1 : 0;
+  const base = (admissionCategory || '').toLowerCase() === 'lateral' ? 3 : 1;
+  const term = yearsElapsed * 2 + semesterOffset + base;
+  return Math.min(Math.max(term, base), 8);
+}
+
 function getStatusBadge(enq) {
   const stage = getStage(enq);
   if (enq.status === 'Converted') return { label: 'Active', cls: 'bg-green-500 text-white' };
@@ -376,6 +398,28 @@ export default function ScheduleDetailPage() {
     try {
       const { data } = await moveEnquiryStage(id, newStage);
       setEnquiries((p) => p.map((e) => (e._id === id ? data.data : e)));
+
+      // When moved to Admitted, auto-convert to a Student record immediately.
+      // Uses force:true so missing documents don't block the conversion.
+      if (newStage === 'Admitted') {
+        try {
+          await convertEnquiry(id, { force: true });
+          // Reload both enquiries and schedule so seat counts + USNs are fresh
+          const [{ data: eData }, { data: sData }] = await Promise.all([
+            getEnquiries({ scheduleId: schId }),
+            getSchedule(schId),
+          ]);
+          setEnquiries(eData.data || []);
+          setSchedule(sData.data);
+          toast('Student admitted and record created');
+        } catch (convertErr) {
+          // Stage was already moved — just warn, don't revert
+          toast(
+            convertErr.response?.data?.error || 'Stage updated but student record creation failed',
+            'error'
+          );
+        }
+      }
     } catch (err) {
       toast(err.response?.data?.error || 'Stage update failed', 'error');
     } finally {
@@ -423,7 +467,7 @@ export default function ScheduleDetailPage() {
         // admission
         admissionDate: str(addForm.admissionDate),
         admissionMode: str(addForm.admissionMode),
-        quota: str(addForm.quota),
+        quota: addForm.quota || '',
         seatNumber: str(addForm.seatNumber),
         seatCategory: str(addForm.seatCategory),
         kannada: str(addForm.kannada),
@@ -477,6 +521,7 @@ export default function ScheduleDetailPage() {
       };
 
       // Step 1: Create enquiry record with all details
+      console.log('SENDING:', payload);
       const { data: enqData } = await createEnquiry(payload);
       const newEnquiry = enqData.data;
 
@@ -934,7 +979,23 @@ export default function ScheduleDetailPage() {
                 </div>
                 <div>
                   {lbl('Quota')}
-                  {ds('quota', 'quota', '— Select Quota —', true)}
+                  <select
+                    value={addForm.quota || ''}
+                    onChange={(e) => {
+                      console.log('QUOTA SELECTED:', e.target.value);
+                      setAddForm((prev) => ({ ...prev, quota: e.target.value }));
+                    }}
+                    className="w-full px-4 py-3 text-sm rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">— Select Quota —</option>
+                    <option value="Management">Management</option>
+                    <option value="CET">CET</option>
+                    <option value="COMEDK">COMEDK</option>
+                    <option value="NRI">NRI</option>
+                    <option value="Government">Government</option>
+                    <option value="Minority">Minority</option>
+                    <option value="SNQ">SNQ</option>
+                  </select>
                 </div>
                 <div>
                   {lbl('Seat Number')}
@@ -1860,10 +1921,15 @@ export default function ScheduleDetailPage() {
                               </span>
                             </td>
 
-                            {/* Term */}
+                            {/* Term — show current dynamic term when batch is known */}
                             <td className="px-4 py-3 text-center">
                               <span className="text-sm font-bold text-gray-700 dark:text-slate-300">
-                                {e.term || '—'}
+                                {calcCurrentTerm(
+                                  e.batch || schedule?.academicYear,
+                                  e.admissionCategory
+                                ) ??
+                                  e.term ??
+                                  '—'}
                               </span>
                             </td>
 

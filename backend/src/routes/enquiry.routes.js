@@ -3,6 +3,7 @@ const router = express.Router();
 const Enquiry = require('../models/enquiry.model');
 const Schedule = require('../models/schedule.model');
 const Student = require('../models/student.model');
+const { getTenantFilter } = require('../utils/tenantFilter');
 
 // Extract degree from schedule name — mirrors schedule.routes.js logic
 function extractDegreeFromSchedule(schedule) {
@@ -73,7 +74,7 @@ router.get('/', async (req, res) => {
       scheduleId = '',
       admissionStage = '',
     } = req.query;
-    const filter = {};
+    const filter = { ...getTenantFilter(req.tenantId) };
 
     if (q.trim()) {
       filter.$or = [
@@ -99,6 +100,7 @@ router.get('/', async (req, res) => {
 // ── POST /api/enquiry/create ──────────────────────────────────────────────────
 router.post('/create', async (req, res) => {
   try {
+    console.log('REQ BODY quota:', req.body.quota);
     const { name, phone, email, stream, scheduleId } = req.body;
 
     // Required field validation
@@ -234,6 +236,7 @@ router.post('/create', async (req, res) => {
       }));
     }
 
+    if (req.tenantId) payload.tenantId = req.tenantId;
     const enquiry = await Enquiry.create(payload);
     res.status(201).json({ success: true, data: enquiry });
   } catch (err) {
@@ -359,9 +362,11 @@ router.post('/convert/:id', async (req, res) => {
       dob: enquiry.dob || null,
       religion: enquiry.religion || '',
       caste: enquiry.caste || '',
+      quota: enquiry.quota || '',
       fatherName: enquiry.fatherName || '',
       admissionDate: enquiry.admissionDate || null,
       lastJoiningDate: enquiry.lastJoiningDate || null,
+      ...(enquiry.tenantId && { tenantId: enquiry.tenantId }),
     });
 
     // Update enquiry

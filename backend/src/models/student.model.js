@@ -8,6 +8,7 @@ const generateStudentId = () => {
 
 const studentSchema = new mongoose.Schema(
   {
+    tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', index: true, default: null },
     student_id: {
       type: String,
       unique: true,
@@ -81,6 +82,18 @@ const studentSchema = new mongoose.Schema(
       type: Boolean,
       default: true, // assume cleared unless explicitly marked otherwise
     },
+    attendanceCleared: {
+      type: Boolean,
+      default: true,
+    },
+    examPassed: {
+      type: Boolean,
+      default: true,
+    },
+    noDues: {
+      type: Boolean,
+      default: true,
+    },
     address: {
       type: String,
       trim: true,
@@ -95,6 +108,7 @@ const studentSchema = new mongoose.Schema(
     dob: { type: Date, default: null },
     religion: { type: String, trim: true, default: '' },
     caste: { type: String, trim: true, default: '' },
+    quota: { type: String, trim: true, default: '' },
     fatherName: { type: String, trim: true, default: '' },
     admissionDate: { type: Date, default: null },
     lastJoiningDate: { type: Date, default: null },

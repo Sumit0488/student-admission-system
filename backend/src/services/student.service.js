@@ -2,21 +2,42 @@ const Student = require('../models/student.model');
 const generateUSN = require('../utils/generateUSN');
 const { notFound, duplicate, validationErr } = require('../utils/errorHandler');
 const { validateCreateInput, validateUpdateInput, validateStatus } = require('../utils/validators');
+const { getTenantFilter } = require('../utils/tenantFilter');
 
 // ─── Capitalize each word: "vinay k b" → "Vinay K B" ────────────────────────
 const toTitleCase = (str) => str.replace(/\b\w/g, (c) => c.toUpperCase());
 
 // ─── Dynamic term calculation ─────────────────────────────────────────────────
 // batch format: "2022-23", "2025-26"
-// Regular: (currentYear - batchYear) * 2 + 1   →  starts at semester 1
-// Lateral:  (currentYear - batchYear) * 2 + 3   →  starts at semester 3
+// Indian academic year runs Aug–Jul (two semesters each):
+//   Semester 1 (odd):  Aug – Jan
+//   Semester 2 (even): Feb – Jul
+// Regular: starts at semester 1 | Lateral: starts at semester 3
 const calculateTerm = (batch, admissionCategory) => {
   if (!batch) return null;
   const batchYear = parseInt((batch || '').split('-')[0], 10);
   if (isNaN(batchYear)) return null;
-  const currentYear = new Date().getFullYear();
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // 1-12
+
+  // The academic year that is currently active.
+  // Aug–Dec of a year → that year is the start of the academic year.
+  // Jan–Jul of a year → the previous year is the start of the academic year.
+  const academicStartYear = currentMonth >= 8 ? currentYear : currentYear - 1;
+
+  // How many complete academic years have elapsed since enrollment
+  const yearsElapsed = academicStartYear - batchYear;
+  if (yearsElapsed < 0) return null; // batch is in the future — no term yet
+
+  // Within the current academic year:
+  //   Aug–Jan (month >= 8 or month == 1): first semester of that year → offset 0
+  //   Feb–Jul (month 2-7):               second semester of that year → offset 1
+  const semesterOffset = currentMonth >= 2 && currentMonth <= 7 ? 1 : 0;
+
   const base = (admissionCategory || '').toLowerCase() === 'lateral' ? 3 : 1;
-  const term = (currentYear - batchYear) * 2 + base;
+  const term = yearsElapsed * 2 + semesterOffset + base;
   return Math.min(Math.max(term, base), 8);
 };
 
@@ -36,14 +57,21 @@ const format = (s) => ({
   department: s.department || s.program || '',
   semester: calculateTerm(s.batch, s.admissionCategory) ?? s.term ?? null,
   admissionCategory: s.admissionCategory || '',
+  quota: s.quota || '',
   status: s.admissionStatus,
   isDebarred: s.isDebarred ?? false,
   feesCleared: s.feesCleared ?? true,
+  attendanceCleared: s.attendanceCleared ?? true,
+  examPassed: s.examPassed ?? true,
+  noDues: s.noDues ?? true,
   createdAt: s.createdAt,
 });
 
+// ─── Tenant filter helper — includes legacy records (no tenantId) ────────────
+const tenantFilter = (tenantId) => getTenantFilter(tenantId);
+
 // ─── CREATE ───────────────────────────────────────────────────────────────────
-const createStudent = async (body) => {
+const createStudent = async (body, tenantId = null) => {
   validateCreateInput(body);
 
   const name = toTitleCase((body.name || '').trim());
@@ -83,16 +111,17 @@ const createStudent = async (body) => {
     term,
     admissionCategory,
     admissionStatus: status || 'Live',
+    ...(tenantId && { tenantId }),
   });
 
   return format(student);
 };
 
 // ─── READ ALL (with filters + pagination) ────────────────────────────────────
-const getStudents = async (query = {}) => {
+const getStudents = async (query = {}, tenantId = null) => {
   const { q = '', program = '', batch = '', status = '', page = 1, limit = 20 } = query;
 
-  const filter = { isDeleted: { $ne: true } };
+  const filter = { ...tenantFilter(tenantId), isDeleted: { $ne: true } };
 
   if (q.trim()) {
     filter.$or = [
@@ -119,9 +148,9 @@ const getStudents = async (query = {}) => {
 };
 
 // ─── STATUS COUNTS (aggregation) ─────────────────────────────────────────────
-const getStatusCounts = async () => {
+const getStatusCounts = async (tenantId = null) => {
   const rows = await Student.aggregate([
-    { $match: { isDeleted: { $ne: true } } },
+    { $match: { ...tenantFilter(tenantId), isDeleted: { $ne: true } } },
     { $group: { _id: '$admissionStatus', count: { $sum: 1 } } },
   ]);
   const counts = { Live: 0, Completed: 0, Cancelled: 0, Detained: 0 };
@@ -145,7 +174,7 @@ const updateStudent = async (id, body) => {
   const name = body.name !== undefined ? toTitleCase(body.name.trim()) : undefined;
   if (name !== undefined && !name) throw validationErr('Full name cannot be empty');
   const program = body.program !== undefined ? body.program.trim() : undefined;
-  const degree = body.degree !== undefined ? body.degree.trim() || null : undefined;
+  const degree = body.degree !== undefined ? body.degree?.trim() || null : undefined;
   const batch = body.batch !== undefined ? body.batch.trim() : undefined;
   const status = body.status !== undefined ? body.status.trim() : undefined;
   const phone = body.phone !== undefined ? body.phone.trim() : undefined;
@@ -192,8 +221,14 @@ const updateStudent = async (id, body) => {
       ...(personalEmail !== undefined && { personalEmail }),
       ...(term !== undefined && { term }),
       ...(admissionCategory !== undefined && { admissionCategory }),
+      ...(body.quota !== undefined && { quota: body.quota.trim() }),
       ...(body.isDebarred !== undefined && { isDebarred: Boolean(body.isDebarred) }),
       ...(body.feesCleared !== undefined && { feesCleared: Boolean(body.feesCleared) }),
+      ...(body.attendanceCleared !== undefined && {
+        attendanceCleared: Boolean(body.attendanceCleared),
+      }),
+      ...(body.examPassed !== undefined && { examPassed: Boolean(body.examPassed) }),
+      ...(body.noDues !== undefined && { noDues: Boolean(body.noDues) }),
     },
     { new: true, runValidators: true }
   );
@@ -223,8 +258,9 @@ const getDistinctPrograms = async () => {
 };
 
 // ─── SEARCH ───────────────────────────────────────────────────────────────────
-const searchStudents = async (query = '') => {
+const searchStudents = async (query = '', tenantId = null) => {
   const students = await Student.find({
+    ...tenantFilter(tenantId),
     isDeleted: { $ne: true },
     fullName: { $regex: query.trim(), $options: 'i' },
   }).sort({ createdAt: -1 });
@@ -245,10 +281,10 @@ const updateStudentStatus = async (id, status) => {
 };
 
 // ─── EXPORT (Live students only, no pagination) ───────────────────────────────
-const exportStudents = async (query = {}) => {
+const exportStudents = async (query = {}, tenantId = null) => {
   const { program = '' } = query;
 
-  const filter = { isDeleted: { $ne: true }, admissionStatus: 'Live' };
+  const filter = { ...tenantFilter(tenantId), isDeleted: { $ne: true }, admissionStatus: 'Live' };
   if (program) filter.program = program;
 
   const students = await Student.find(filter)
@@ -266,8 +302,8 @@ const exportStudents = async (query = {}) => {
 // ─── FULL REPORT (all statuses, all students, no pagination) ─────────────────
 const REPORT_STATUSES = ['Live', 'Completed', 'Cancelled', 'Detained'];
 
-const exportFullReport = async () => {
-  const students = await Student.find({ isDeleted: { $ne: true } })
+const exportFullReport = async (tenantId = null) => {
+  const students = await Student.find({ ...tenantFilter(tenantId), isDeleted: { $ne: true } })
     .sort({ admissionStatus: 1, program: 1, student_id: 1 })
     .select('student_id fullName email program batch admissionStatus');
 

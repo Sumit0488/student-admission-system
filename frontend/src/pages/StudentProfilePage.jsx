@@ -237,8 +237,14 @@ export default function StudentProfilePage() {
     setLoading(true);
     apiGetStudentById(id)
       .then(({ data }) => {
-        setStudent(data.data);
-        setForm(data.data);
+        const d = data.data;
+        setStudent(d);
+        setForm({
+          ...d,
+          attendanceCleared: d.attendanceCleared ?? true,
+          examPassed: d.examPassed ?? true,
+          noDues: d.noDues ?? true,
+        });
       })
       .catch(() => showToast('Failed to load student profile', 'error'))
       .finally(() => setLoading(false));
@@ -428,7 +434,7 @@ export default function StudentProfilePage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const { data } = await apiUpdateStudent(id, {
+      const payload = {
         name: form.name,
         program: form.program,
         degree: form.degree || null,
@@ -438,11 +444,22 @@ export default function StudentProfilePage() {
         address: form.address,
         city: form.city,
         personalEmail: form.personalEmail,
+        quota: form.quota || '',
         isDebarred: form.isDebarred,
         feesCleared: form.feesCleared,
+        attendanceCleared: form.attendanceCleared,
+        examPassed: form.examPassed,
+        noDues: form.noDues,
+      };
+      const { data } = await apiUpdateStudent(id, payload);
+      const saved = data.data;
+      setStudent(saved);
+      setForm({
+        ...saved,
+        attendanceCleared: saved.attendanceCleared ?? true,
+        examPassed: saved.examPassed ?? true,
+        noDues: saved.noDues ?? true,
       });
-      setStudent(data.data);
-      setForm(data.data);
       setEditMode(false);
       showToast('Profile updated successfully');
     } catch (err) {
@@ -520,7 +537,12 @@ export default function StudentProfilePage() {
                 <>
                   <button
                     onClick={() => {
-                      setForm(student);
+                      setForm({
+                        ...student,
+                        attendanceCleared: student.attendanceCleared ?? true,
+                        examPassed: student.examPassed ?? true,
+                        noDues: student.noDues ?? true,
+                      });
                       setEditMode(false);
                     }}
                     className="flex items-center gap-1.5 px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
@@ -568,7 +590,7 @@ export default function StudentProfilePage() {
               }
             />
             <InfoCard label="Status" value={student.status} />
-            <InfoCard label="Quota" value={student.quota || 'General'} />
+            <InfoCard label="Quota" value={student.quota || '—'} />
           </div>
         </div>
 
@@ -664,6 +686,51 @@ export default function StudentProfilePage() {
                     onChange={handleChange}
                     options={config.statuses}
                   />
+                  {/* Quota — direct select to avoid generic handleChange key mismatch */}
+                  <div className="flex items-start gap-4 py-4 border-b border-gray-100 dark:border-slate-700">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Hash size={15} className="text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-1">
+                        Quota / Caste
+                      </p>
+                      {editMode ? (
+                        <select
+                          name="quota"
+                          value={form.quota || ''}
+                          onChange={(e) => {
+                            setForm((prev) => ({ ...prev, quota: e.target.value }));
+                          }}
+                          className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          {[
+                            '',
+                            'Management',
+                            'CET',
+                            'COMEDK',
+                            'NRI',
+                            'Government',
+                            'Minority',
+                            'SNQ',
+                            'Other',
+                          ].map((o) => (
+                            <option key={o} value={o}>
+                              {o === '' ? '— Not provided —' : o}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <p className="text-sm text-gray-900 dark:text-white font-medium">
+                          {form.quota || (
+                            <span className="text-gray-400 dark:text-slate-500 italic font-normal">
+                              Not provided
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                   <Field
                     icon={GraduationCap}
                     label="Term (assigned at admission)"
@@ -710,7 +777,9 @@ export default function StudentProfilePage() {
                       {editMode && (
                         <button
                           type="button"
-                          onClick={() => setForm((p) => ({ ...p, feesCleared: !p.feesCleared }))}
+                          onClick={() =>
+                            setForm((prev) => ({ ...prev, feesCleared: !prev.feesCleared }))
+                          }
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none
                             ${form.feesCleared ? 'bg-green-500' : 'bg-gray-300 dark:bg-slate-600'}`}
                         >
@@ -733,7 +802,7 @@ export default function StudentProfilePage() {
                         </div>
                         <div>
                           <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wide">
-                            Debarment Status
+                            Department Status
                           </p>
                           <p
                             className={`text-sm font-medium mt-0.5 ${form.isDebarred ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'}`}
@@ -745,7 +814,9 @@ export default function StudentProfilePage() {
                       {editMode && (
                         <button
                           type="button"
-                          onClick={() => setForm((p) => ({ ...p, isDebarred: !p.isDebarred }))}
+                          onClick={() =>
+                            setForm((prev) => ({ ...prev, isDebarred: !prev.isDebarred }))
+                          }
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none
                             ${form.isDebarred ? 'bg-red-500' : 'bg-gray-300 dark:bg-slate-600'}`}
                         >
@@ -755,14 +826,135 @@ export default function StudentProfilePage() {
                         </button>
                       )}
                     </div>
+                    {/* Attendance Cleared toggle */}
+                    <div className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-slate-700">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${form.attendanceCleared ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}
+                        >
+                          <CheckCircle
+                            size={15}
+                            className={form.attendanceCleared ? 'text-green-600' : 'text-red-500'}
+                          />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wide">
+                            Attendance
+                          </p>
+                          <p
+                            className={`text-sm font-medium mt-0.5 ${form.attendanceCleared ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+                          >
+                            {form.attendanceCleared
+                              ? 'Attendance requirement met'
+                              : 'Attendance shortage'}
+                          </p>
+                        </div>
+                      </div>
+                      {editMode && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              attendanceCleared: !prev.attendanceCleared,
+                            }))
+                          }
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none
+                            ${form.attendanceCleared ? 'bg-green-500' : 'bg-gray-300 dark:bg-slate-600'}`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.attendanceCleared ? 'translate-x-6' : 'translate-x-1'}`}
+                          />
+                        </button>
+                      )}
+                    </div>
+                    {/* Exam Passed toggle */}
+                    <div className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-slate-700">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${form.examPassed ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}
+                        >
+                          <CheckCircle
+                            size={15}
+                            className={form.examPassed ? 'text-green-600' : 'text-red-500'}
+                          />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wide">
+                            Exam Status
+                          </p>
+                          <p
+                            className={`text-sm font-medium mt-0.5 ${form.examPassed ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+                          >
+                            {form.examPassed ? 'All exams passed' : 'Exam(s) not cleared'}
+                          </p>
+                        </div>
+                      </div>
+                      {editMode && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({ ...prev, examPassed: !prev.examPassed }))
+                          }
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none
+                            ${form.examPassed ? 'bg-green-500' : 'bg-gray-300 dark:bg-slate-600'}`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.examPassed ? 'translate-x-6' : 'translate-x-1'}`}
+                          />
+                        </button>
+                      )}
+                    </div>
+                    {/* No Dues toggle */}
+                    <div className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-slate-700">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${form.noDues ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}
+                        >
+                          <CheckCircle
+                            size={15}
+                            className={form.noDues ? 'text-green-600' : 'text-red-500'}
+                          />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wide">
+                            No Dues
+                          </p>
+                          <p
+                            className={`text-sm font-medium mt-0.5 ${form.noDues ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+                          >
+                            {form.noDues ? 'No pending dues' : 'Dues outstanding'}
+                          </p>
+                        </div>
+                      </div>
+                      {editMode && (
+                        <button
+                          type="button"
+                          onClick={() => setForm((prev) => ({ ...prev, noDues: !prev.noDues }))}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none
+                            ${form.noDues ? 'bg-green-500' : 'bg-gray-300 dark:bg-slate-600'}`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.noDues ? 'translate-x-6' : 'translate-x-1'}`}
+                          />
+                        </button>
+                      )}
+                    </div>
                     {/* Warning banner when ineligible */}
-                    {(form.isDebarred || !form.feesCleared) && (
+                    {(form.isDebarred ||
+                      !form.feesCleared ||
+                      !form.attendanceCleared ||
+                      !form.examPassed ||
+                      !form.noDues) && (
                       <div className="flex items-start gap-2 px-3 py-2.5 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800">
                         <AlertCircle size={14} className="text-red-500 flex-shrink-0 mt-0.5" />
                         <p className="text-xs text-red-700 dark:text-red-400">
                           Certificate issuance is <strong>blocked</strong> for this student.
                           {form.isDebarred && ' Debarment active.'}
                           {!form.feesCleared && ' Fees not cleared.'}
+                          {!form.attendanceCleared && ' Attendance shortage.'}
+                          {!form.examPassed && ' Exam(s) not cleared.'}
+                          {!form.noDues && ' Dues outstanding.'}
                         </p>
                       </div>
                     )}

@@ -27,6 +27,7 @@ const Certificate = require('../models/certificate.model');
 const CertificateTemplate = require('../models/certificate-template.model');
 const Approval = require('../models/approval.model');
 const Student = require('../models/student.model');
+const { getTenantFilter } = require('../utils/tenantFilter');
 
 // multer — memory storage (no temp files), 10 MB limit, PDF only
 const pdfUpload = multer({
@@ -231,12 +232,23 @@ function buildAutoVars(student, fallbackName, fallbackUsn) {
     };
   }
 
-  // Dynamic term: (currentYear - batchYear) * 2 + base (1=Regular, 3=Lateral), cap at 8
+  // Dynamic term — month-aware academic year calculation (mirrors student.service.js calculateTerm)
+  // Indian academic year: Aug–Jul  |  Sem 1 = Aug–Jan, Sem 2 = Feb–Jul
   const calcSem = () => {
     const batchYear = parseInt((student.batch || '').split('-')[0], 10);
     if (isNaN(batchYear)) return student.term ?? 1;
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // 1-12
+    // Academic year that is currently active
+    const academicStartYear = currentMonth >= 8 ? currentYear : currentYear - 1;
+    const yearsElapsed = academicStartYear - batchYear;
+    if (yearsElapsed < 0) return student.term ?? 1; // batch in future
+    // Feb–Jul = second semester of the academic year (+1), otherwise first (+0)
+    const semesterOffset = currentMonth >= 2 && currentMonth <= 7 ? 1 : 0;
     const base = (student.admissionCategory || '').toLowerCase() === 'lateral' ? 3 : 1;
-    return Math.min(Math.max((new Date().getFullYear() - batchYear) * 2 + base, base), 8);
+    const term = yearsElapsed * 2 + semesterOffset + base;
+    return Math.min(Math.max(term, base), 8);
   };
   const sem = calcSem();
   const semStr = String(sem);
@@ -377,6 +389,15 @@ async function checkEligibility(usn, certificateType) {
   if (!student.feesCleared) {
     errors.push('Fees not cleared — please settle outstanding dues first');
   }
+  if (student.attendanceCleared === false) {
+    errors.push('Attendance not cleared — minimum attendance requirement not met');
+  }
+  if (student.examPassed === false) {
+    errors.push('Exam not passed — all examinations must be cleared');
+  }
+  if (student.noDues === false) {
+    errors.push('Dues pending — all dues must be cleared before issuing certificates');
+  }
   if (certificateType === 'Transfer Certificate' && !student.feesCleared) {
     errors.push('Transfer Certificate requires all fees to be cleared');
   }
@@ -416,6 +437,93 @@ function syncFieldsFromNotes(notes, suppliedFields) {
   );
 }
 
+// ── Rebuild Puppeteer-ready HTML from template notes + images ─────────────────
+// Mirrors the frontend buildFullHtml() so PDF output matches the editor preview.
+// Called at PDF-generation time — fullHtml is never stored in MongoDB.
+function buildTemplateHtml(tmpl) {
+  const notes = tmpl.notes || '';
+  const images = tmpl.images || [];
+
+  const PAGE_W = 794;
+  const BANNER_W = Math.round(PAGE_W * 0.7); // 556 px — same threshold as frontend
+  const PAD_TOP = 60;
+  const PAD_SIDE = 70;
+
+  const sorted = [...images].sort((a, b) => a.x - b.x);
+  const headerImgs = sorted.filter((img) => img.y < 200);
+  const bodyImgs = sorted.filter((img) => img.y >= 200);
+  const bannerImgs = headerImgs.filter((img) => img.width >= BANNER_W);
+  const logoImgs = headerImgs.filter((img) => img.width < BANNER_W);
+
+  const bannerHtml = bannerImgs
+    .map(
+      (img) =>
+        `<div style="margin:-${PAD_TOP}px -${PAD_SIDE}px 12px -${PAD_SIDE}px;line-height:0;">` +
+        `<img src="${img.src}" style="width:100%;display:block;" /></div>`
+    )
+    .join('');
+
+  let headerTableHtml = '';
+  if (logoImgs.length >= 2) {
+    const L = logoImgs[0];
+    const R = logoImgs[logoImgs.length - 1];
+    headerTableHtml =
+      `<table style="width:100%;border:none;border-collapse:collapse;margin:0 0 6px 0;table-layout:fixed;"><tr>` +
+      `<td style="border:none;padding:0;text-align:left;width:${L.width}px;vertical-align:middle;">` +
+      `<img src="${L.src}" width="${L.width}" height="${L.height}" style="display:block;" /></td>` +
+      `<td style="border:none;padding:0;"></td>` +
+      `<td style="border:none;padding:0;text-align:right;width:${R.width}px;vertical-align:middle;">` +
+      `<img src="${R.src}" width="${R.width}" height="${R.height}" style="display:block;margin-left:auto;" /></td>` +
+      `</tr></table>`;
+  } else if (logoImgs.length === 1) {
+    const img = logoImgs[0];
+    const side = img.x > PAGE_W / 2 ? 'right' : 'left';
+    headerTableHtml =
+      `<table style="width:100%;border:none;border-collapse:collapse;margin:0 0 6px 0;"><tr>` +
+      `<td style="border:none;padding:0;text-align:${side};vertical-align:middle;">` +
+      `<img src="${img.src}" width="${img.width}" height="${img.height}" ` +
+      `style="display:block;${side === 'right' ? 'margin-left:auto;' : ''}" /></td></tr></table>`;
+  }
+
+  const imgsHtml = bodyImgs
+    .map(
+      (img) =>
+        `<img src="${img.src}" style="position:absolute;left:${img.x}px;top:${img.y}px;` +
+        `width:${img.width}px;height:${img.height}px;z-index:10;pointer-events:none;" />`
+    )
+    .join('');
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    @page { margin: 0; size: A4 portrait; }
+    body { margin:0; font-family:Arial,sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .page { width:794px; min-height:1123px; height:auto; margin:auto; padding:60px 70px; box-sizing:border-box; position:relative; background:white; overflow:visible; font-size:14px; line-height:1.7; }
+    .center { text-align:center; }
+    .row { display:table; width:100%; table-layout:fixed; }
+    .row > * { display:table-cell; vertical-align:top; white-space:nowrap; }
+    .row > *:last-child { text-align:right; }
+    .page-break { page-break-after:always; break-after:page; }
+    table { width:100%; border-collapse:collapse; margin:12px 0; }
+    th, td { border:1px solid #cbd5e1; padding:8px 12px; vertical-align:top; }
+    th { background:#f8fafc; font-weight:600; text-align:left; }
+    p { margin:6px 0; }
+    p:empty::before { content:'\\00a0'; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    ${bannerHtml}
+    ${headerTableHtml}
+    ${notes}
+    ${imgsHtml}
+  </div>
+</body>
+</html>`;
+}
+
 // Add computed fieldCount (from content) to a plain template object
 function withFieldCount(tmpl) {
   const obj = tmpl.toObject ? tmpl.toObject() : { ...tmpl };
@@ -424,9 +532,10 @@ function withFieldCount(tmpl) {
 }
 
 // GET /api/certificates/templates
-router.get('/templates', async (_req, res) => {
+router.get('/templates', async (req, res) => {
   try {
-    const templates = await CertificateTemplate.find().sort({ createdAt: -1 });
+    const filter = getTenantFilter(req.tenantId);
+    const templates = await CertificateTemplate.find(filter).sort({ createdAt: -1 });
     res.json({
       success: true,
       data: (templates || []).map(withFieldCount),
@@ -443,7 +552,7 @@ router.get('/templates', async (_req, res) => {
 // POST /api/certificates/templates
 router.post('/templates', async (req, res) => {
   try {
-    const { name, description, notes, fullHtml, fields, status, images } = req.body;
+    const { name, description, notes, fields, status, images } = req.body;
     if (!name?.trim())
       return res.status(400).json({ success: false, error: 'Template name is required' });
     const syncedFields = syncFieldsFromNotes(notes, fields);
@@ -451,10 +560,12 @@ router.post('/templates', async (req, res) => {
       name: name.trim(),
       description: description?.trim() || '',
       notes: notes || '',
-      fullHtml: fullHtml || '',
+      // fullHtml is NOT stored — it is rebuilt at PDF-generation time from notes + images.
+      // Storing it would embed large base64 images and hit MongoDB's 16 MB document limit.
       fields: syncedFields,
       images: Array.isArray(images) ? images : [],
       status: status === 'LIVE' ? 'LIVE' : 'DRAFT',
+      ...(req.tenantId && { tenantId: req.tenantId }),
     });
     res.status(201).json({ success: true, data: withFieldCount(tmpl) });
   } catch (err) {
@@ -481,7 +592,8 @@ router.get('/templates/:id', async (req, res) => {
 // PUT /api/certificates/templates/:id
 router.put('/templates/:id', async (req, res) => {
   try {
-    const { name, description, notes, fullHtml, fields, status, images } = req.body;
+    const { name, description, notes, fields, status, images } = req.body;
+    // fullHtml is intentionally excluded — it is rebuilt at PDF-generation time.
     const syncedFields = syncFieldsFromNotes(notes, fields);
     const updateData = {
       name,
@@ -490,8 +602,9 @@ router.put('/templates/:id', async (req, res) => {
       fields: syncedFields,
       status,
       images: Array.isArray(images) ? images : [],
+      // Unset any previously stored fullHtml so old large documents get cleaned up
+      $unset: { fullHtml: '' },
     };
-    if (fullHtml !== undefined) updateData.fullHtml = fullHtml;
     const tmpl = await CertificateTemplate.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
       runValidators: true,
@@ -567,11 +680,11 @@ router.delete('/templates/:id', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // GET /api/certificates?usn=xxx&studentName=xxx
-router.get('/', async (_req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const filter = {};
-    if (_req.query.usn) filter.usn = _req.query.usn;
-    if (_req.query.studentName) filter.studentName = new RegExp(_req.query.studentName, 'i');
+    const filter = { ...getTenantFilter(req.tenantId) };
+    if (req.query.usn) filter.usn = req.query.usn;
+    if (req.query.studentName) filter.studentName = new RegExp(req.query.studentName, 'i');
 
     const certificates = await Certificate.find(filter)
       .populate({
@@ -588,7 +701,7 @@ router.get('/', async (_req, res) => {
       type: c.type || c.templateId?.name || 'Certificate',
       status: c.status || 'Pending',
       pdfBase64: c.pdfBase64 || null,
-      generatedAt: c.generatedAt || null,
+      generatedDate: c.generatedDate || null,
       requestedDate: c.requestedDate || null,
       templateId: c.templateId || null,
       createdAt: c.createdAt || null,
@@ -665,6 +778,7 @@ router.post('/issue', async (req, res) => {
       templateId,
       filledNotes,
       fieldValues: valMap,
+      ...(req.tenantId && { tenantId: req.tenantId }),
     });
 
     // Auto-create Approval entry
@@ -674,6 +788,7 @@ router.post('/issue', async (req, res) => {
       certificate: cert.type,
       requestedDate: cert.requestedDate,
       certificateRef: cert._id,
+      ...(req.tenantId && { tenantId: req.tenantId }),
     });
 
     res.status(201).json({ success: true, data: cert });
@@ -781,8 +896,14 @@ router.get('/pdf/:id', async (req, res) => {
       });
     }
 
-    // Prefer fullHtml (Puppeteer-ready); fall back to notes wrapped in a shell
-    const tmpl = cert.templateId;
+    let tmpl = cert.templateId;
+    if (!tmpl && cert.type) {
+      // Try to find template by name (handles underscore vs space mismatch)
+      const normalizedType = cert.type.replace(/_/g, ' ');
+      tmpl = await CertificateTemplate.findOne({
+        name: { $regex: new RegExp(`^${normalizedType}$`, 'i') },
+      });
+    }
     if (!tmpl) {
       return res.status(400).json({
         success: false,
@@ -797,12 +918,8 @@ router.get('/pdf/:id', async (req, res) => {
     });
 
     const vars = buildAutoVars(student, cert.studentName, cert.usn);
-    const htmlContent =
-      tmpl.fullHtml ||
-      buildCertHtml(
-        cert,
-        new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-      );
+    // Always rebuild HTML from notes + images — fullHtml is no longer stored in DB.
+    const htmlContent = buildTemplateHtml(tmpl);
     const finalHTML = substituteVars(htmlContent, vars);
 
     // 🔥 Generate PDF using Puppeteer on-the-fly
@@ -816,34 +933,55 @@ router.get('/pdf/:id', async (req, res) => {
     // default 800 × 600 viewport, which can cause subtle scaling differences
     // that shift absolute-positioned images relative to the text content.
     await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1 });
-    // Override any stored template CSS that hard-clips content at 1123 px.
+    // Switch to print media BEFORE setContent so @page{margin:0} is honoured
+    // and the banner's negative-margin bleed reaches the physical page edge.
+    await page.emulateMediaType('print');
+
+    // Inject CSS that matches the editor exactly — same line-height and margins
+    // so the preview and PDF render identically.
     const fixedHTML = finalHTML.replace(
       '</head>',
       '<style>' +
+        '@page{margin:0!important;size:A4 portrait;}' +
         'html,body{margin:0;padding:0;width:794px;font-family:Arial,sans-serif;}' +
-        '.page{width:794px!important;min-height:1123px!important;height:auto!important;overflow:visible!important;box-sizing:border-box!important;padding:40px 60px!important;page-break-after:auto!important;}' +
-        '.page:last-child{page-break-after:avoid!important;}' +
-        'p{margin:2px 0!important;line-height:1.3!important;}' +
-        'p,div,tr{page-break-inside:auto;}' +
-        '.no-break{page-break-inside:avoid!important;break-inside:avoid!important;}' +
+        '.page{width:794px!important;min-height:1123px!important;height:auto!important;' +
+        'overflow:visible!important;box-sizing:border-box!important;' +
+        'padding:60px 70px!important;page-break-after:avoid!important;}' +
+        'p{margin:6px 0!important;line-height:1.7!important;}' +
+        'p:empty::before{content:"\\00a0";}' +
+        '*{page-break-inside:avoid!important;break-inside:avoid!important;}' +
+        '.page-break{page-break-after:always!important;break-after:page!important;}' +
         '</style></head>'
     );
     await page.setContent(fixedHTML, { waitUntil: 'networkidle0' });
 
-    // page.pdf() returns Uint8Array in Puppeteer v21+, not a Buffer.
-    // Express res.send() only recognises Buffer — a Uint8Array is treated as
-    // a plain object and gets JSON-serialised as {"0":37,"1":80,...}.
-    // Buffer.from() wraps the Uint8Array into a proper Node.js Buffer.
+    // Measure the actual rendered height of .page and compute a scale factor
+    // so the content always fits within a single A4 page (1123 px at 96 DPI).
+    // If content is shorter than 1123 px, scale stays 1 (no upscaling).
+    const A4_PX = 1123;
+    const contentHeight = await page.evaluate(() => {
+      const el = document.querySelector('.page');
+      return el ? el.scrollHeight : document.body.scrollHeight;
+    });
+    const scale = contentHeight > A4_PX ? parseFloat((A4_PX / contentHeight).toFixed(4)) : 1;
+    console.log(`[PDF] content height: ${contentHeight}px  →  scale: ${scale}`);
+
     const pdfRaw = await page.pdf({
       format: 'A4',
       printBackground: true,
-      scale: 0.92,
+      scale,
       margin: { top: '0', bottom: '0', left: '0', right: '0' },
     });
     const pdfBuffer = Buffer.isBuffer(pdfRaw) ? pdfRaw : Buffer.from(pdfRaw);
 
     await browser.close();
     browser = null;
+
+    // Stamp generatedDate + status on the certificate now that the PDF is ready
+    await Certificate.findByIdAndUpdate(cert._id, {
+      status: 'Generated',
+      generatedDate: new Date(),
+    });
 
     const safeName = `${(cert.type || 'Certificate').replace(/\s+/g, '_')}_${cert.usn}.pdf`;
 
@@ -926,58 +1064,64 @@ function escHtml(str) {
 */
 
 // POST /api/certificates/templates/upload-pdf
+// Accepts a PDF (field name: "pdf"), extracts text via OCR, returns HTML for the editor.
 router.post('/templates/upload-pdf', pdfUpload.single('pdf'), async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ success: false, error: 'No PDF file received' });
+    return res
+      .status(400)
+      .json({
+        success: false,
+        error: 'No PDF file uploaded. Send the file under the field name "pdf".',
+      });
+  }
+  if (req.file.mimetype !== 'application/pdf') {
+    return res.status(400).json({ success: false, error: 'Only PDF files are accepted.' });
   }
 
-  return res.status(200).json({ success: false, message: 'Feature temporarily disabled' });
+  let html = '';
+  let usedOcr = false;
+  let warning = null;
+  let worker;
 
-  /*
-  let pageCount = 1;
-  let html      = '';
-  let warning   = null;
-  let usedOcr   = false;
-
-  // ── Step 1: try pdf-parse (text-based PDFs) ──────────────────────────────
   try {
-    // FALLBACK: pdf-parse removed for serverless compatibility
-    throw new Error('Feature temporarily disabled');
-  } catch (err) {
-    // Return fallback immediately if OCR is also disabled or we want to blanket disable this.
-    return res.status(200).json({ success: false, message: "Feature temporarily disabled" });
-    // pdf-parse threw — fall through to OCR
-  }
+    const { createWorker } = require('tesseract.js');
+    worker = await createWorker('eng');
 
-  // ── Step 2: OCR fallback (scanned / image-only PDFs) ────────────────────
-  if (!html) {
-    usedOcr = true;
-    let worker;
-    try {
-      const { createWorker } = require('tesseract.js');
-      worker = await createWorker('eng');
-      // Pass the PDF buffer directly; Tesseract will attempt to recognise it.
-      // Works best when the PDF wraps a single JPEG/PNG image.
-      const { data: ocrData } = await worker.recognize(req.file.buffer);
-      const ocrText = (ocrData.text || '').trim();
+    // Tesseract accepts a Buffer — works best for image-embedded PDFs.
+    const { data: ocrData } = await worker.recognize(req.file.buffer);
+    const ocrText = (ocrData.text || '').trim();
 
-      if (ocrText.length >= 5) {
-        // OCR produced something — convert to simple paragraphs
-        html = `<div>${ocrText.replace(/\r?\n/g, '<br/>')}</div>`;
-      } else {
-        html = '<p>Content could not be extracted automatically. Please add your content manually.</p>';
-      }
-    } catch {
-      html = '<p>OCR processing failed. Please add your content manually.</p>';
-    } finally {
-      if (worker) { try { await worker.terminate(); } catch { // ignore } }
+    if (ocrText.length >= 5) {
+      // Wrap each non-empty line as a paragraph so the editor shows clean content
+      const lines = ocrText
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((l) => `<p>${l}</p>`)
+        .join('\n');
+      html = `<div>${lines}</div>`;
+      usedOcr = true;
+      warning =
+        '⚠ OCR was used — layout may differ from the original. Please review and adjust content.';
+    } else {
+      html = '<p>No text could be extracted. Please type your content here.</p>';
+      warning = '⚠ No readable text was found in the PDF. Add content manually.';
     }
-
-    warning = '⚠ Layout may not be perfect — scanned PDF detected. OCR was used; please review and adjust manually.';
+  } catch (err) {
+    console.error('[upload-pdf] OCR error:', err.message);
+    html = '<p>PDF processing failed. Please add your content manually.</p>';
+    warning = '⚠ PDF processing failed. Add content manually.';
+  } finally {
+    if (worker) {
+      try {
+        await worker.terminate();
+      } catch {
+        /* ignore */
+      }
+    }
   }
 
-  res.json({ success: true, html, pages: pageCount, usedOcr, warning });
-  */
+  return res.json({ success: true, html, pages: 1, usedOcr, warning });
 });
 
 module.exports = router;

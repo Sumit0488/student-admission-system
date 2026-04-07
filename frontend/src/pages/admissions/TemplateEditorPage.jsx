@@ -20,19 +20,13 @@ import {
   Type,
   Table2,
   Image,
-  Upload,
   Move,
   Lock,
   Unlock,
   AlignCenter as CenterIcon,
 } from 'lucide-react';
 import { Rnd } from 'react-rnd';
-import {
-  getTemplate,
-  createTemplate,
-  updateTemplate,
-  uploadPdfTemplate,
-} from '../../services/admissionsApi';
+import { getTemplate, createTemplate, updateTemplate } from '../../services/admissionsApi';
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 function useToast() {
@@ -335,7 +329,6 @@ export default function TemplateEditorPage() {
   });
   const [tableToolbar, setTableToolbar] = useState({ show: false, x: 0, y: 0 });
 
-  const [pdfUploading, setPdfUploading] = useState(false);
   const [images, setImages] = useState([]); // floating draggable images
   const [selectedImg, setSelectedImg] = useState(null); // id of selected image
 
@@ -345,7 +338,6 @@ export default function TemplateEditorPage() {
   const contentInitialized = useRef(false); // tracks whether page divs have been seeded with notes content
   const imgInputRef = useRef(null);
   const floatImgRef = useRef(null);
-  const pdfInputRef = useRef(null);
 
   // Helper: get the currently focused page's DOM element
   const getActiveEditor = () => pageRefs.current[activePage];
@@ -422,6 +414,7 @@ export default function TemplateEditorPage() {
 <head>
   <meta charset="UTF-8" />
   <style>
+    @page { margin: 0; size: A4 portrait; }
     body {
       margin: 0;
       font-family: Arial, sans-serif;
@@ -460,10 +453,10 @@ export default function TemplateEditorPage() {
 </head>
 <body>
   <div class="page">
-    ${imgsHtml}
     ${bannerHtml}
     ${headerTableHtml}
     ${rawNotes || ''}
+    ${imgsHtml}
   </div>
 </body>
 </html>`;
@@ -786,41 +779,6 @@ export default function TemplateEditorPage() {
         return { ...img, x: Math.round((794 - img.width) / 2) };
       })
     );
-  };
-
-  // Upload a PDF and load its converted HTML into the editor
-  const handlePdfUpload = async (file) => {
-    if (!file) return;
-    setPdfUploading(true);
-    try {
-      const { data } = await uploadPdfTemplate(file);
-      if (!data.success) throw new Error(data.error || 'Conversion failed');
-
-      // Inject the HTML into page 1 (reset to single page first)
-      setPageCount(1);
-      setNotes(data.html);
-      // Also push directly into the DOM so the editor reflects it immediately
-      requestAnimationFrame(() => {
-        if (pageRefs.current[0]) {
-          pageRefs.current[0].innerHTML = data.html;
-          syncPagesToState();
-        }
-      });
-      setActiveTab('Notes');
-      if (data.warning) {
-        toast(data.warning, 'error');
-      } else {
-        toast(
-          `PDF imported — ${data.pages} page(s) converted. Review and adjust content.`,
-          'success'
-        );
-      }
-    } catch (err) {
-      const msg = err.response?.data?.error || err.message || 'PDF upload failed';
-      toast(msg, 'error');
-    } finally {
-      setPdfUploading(false);
-    }
   };
 
   // Add a new blank page after the current last page
@@ -1161,50 +1119,6 @@ export default function TemplateEditorPage() {
                 )}
               </button>
             ))}
-            {/* Upload PDF Template button */}
-            <div className="ml-auto pr-2 pb-1">
-              <input
-                ref={pdfInputRef}
-                type="file"
-                accept=".pdf,application/pdf"
-                className="hidden"
-                onChange={(e) => {
-                  handlePdfUpload(e.target.files?.[0]);
-                  e.target.value = '';
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => pdfInputRef.current?.click()}
-                disabled={pdfUploading}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 disabled:opacity-50 transition-colors"
-              >
-                {pdfUploading ? (
-                  <>
-                    <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                      />
-                    </svg>
-                    Converting...
-                  </>
-                ) : (
-                  <>
-                    <Upload size={12} /> Upload PDF Template
-                  </>
-                )}
-              </button>
-            </div>
           </div>
 
           {/* ── NOTES TAB ─────────────────────────────────────────────── */}

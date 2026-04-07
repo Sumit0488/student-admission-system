@@ -5,6 +5,7 @@ const CertificateRequest = require('../models/certificate-request.model');
 const Certificate = require('../models/certificate.model');
 const CertificateTemplate = require('../models/certificate-template.model');
 const Student = require('../models/student.model');
+const { getTenantFilter } = require('../utils/tenantFilter');
 
 // ── Variable substitution helpers (mirrors certificate.routes.js logic) ───────
 const PROGRAM_NAMES = {
@@ -131,7 +132,7 @@ function substituteVars(template, vars) {
 router.get('/', async (req, res) => {
   try {
     const { status, q = '' } = req.query;
-    const filter = {};
+    const filter = { ...getTenantFilter(req.tenantId) };
     if (status && status !== 'All') filter.status = status;
     if (q.trim()) {
       filter.$or = [
@@ -140,7 +141,7 @@ router.get('/', async (req, res) => {
         { certificate: { $regex: q.trim(), $options: 'i' } },
       ];
     }
-    const data = await Approval.find(filter).sort({ requestedDate: -1 });
+    const data = await Approval.find(filter).sort({ createdAt: -1 });
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

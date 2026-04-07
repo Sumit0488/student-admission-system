@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Schedule = require('../models/schedule.model');
+const { getTenantFilter } = require('../utils/tenantFilter');
 
 // ── Strict admission-type → term mapping ──────────────────────────────────────
 // Regular = Term 1, Year 1 | Lateral = Term 3, Year 2
@@ -83,9 +84,10 @@ function buildAdmissionDetails(schedule) {
 }
 
 // GET /api/schedules
-router.get('/', async (_req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const data = await Schedule.find().sort({ createdAt: -1 });
+    const filter = getTenantFilter(req.tenantId);
+    const data = await Schedule.find(filter).sort({ createdAt: -1 });
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -116,6 +118,7 @@ router.post('/create', async (req, res) => {
     const schedule = await Schedule.create({
       ...req.body,
       degree: extractDegreeFromName(req.body.scheduleName),
+      ...(req.tenantId && { tenantId: req.tenantId }),
     });
     const scheduleObj = schedule.toObject();
     scheduleObj.admission_details = buildAdmissionDetails(schedule);

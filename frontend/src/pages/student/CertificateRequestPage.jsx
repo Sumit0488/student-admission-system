@@ -204,7 +204,9 @@ export default function CertificateRequestPage() {
         deliveryType: form.deliveryType,
         additionalNotes: form.additionalNotes.trim(),
       };
+      console.log('Sending request:', payload);
       const { data } = await submitCertificateRequest(payload);
+      console.log('Request response:', data);
       setRequests((p) => [data.data, ...p]);
       showToast('Certificate request submitted!');
       setShowModal(false);

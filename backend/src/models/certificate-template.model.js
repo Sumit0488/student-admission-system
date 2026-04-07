@@ -33,10 +33,12 @@ const imageSchema = new mongoose.Schema(
 
 const templateSchema = new mongoose.Schema(
   {
+    tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', index: true, default: null },
     name: { type: String, required: true, trim: true },
     description: { type: String, trim: true, default: '' },
     notes: { type: String, default: '' },
-    fullHtml: { type: String, default: '' },
+    // fullHtml removed — rebuilt at PDF-generation time from notes + images.
+    // Storing it caused MongoDB 16 MB document limit errors when images were embedded as base64.
     fields: { type: [fieldSchema], default: [] },
     images: { type: [imageSchema], default: [] },
     status: { type: String, enum: ['DRAFT', 'LIVE'], default: 'DRAFT' },

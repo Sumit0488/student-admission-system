@@ -22,42 +22,36 @@
  *   Role: admin
  */
 
-const express  = require('express');
+const express = require('express');
 const mongoose = require('mongoose');
-const Student  = require('../models/student.model');
+const Student = require('../models/student.model');
 const EligibilityHistory = require('../models/eligibility-history.model');
 const { checkEligibility, CERTIFICATE_RULES } = require('../services/eligibility.service');
+const { requireAuth } = require('../middleware/auth');
+const { getTenantFilter } = require('../utils/tenantFilter');
 
 const router = express.Router();
 
-// ─── Simple role-based middleware (admin-only) ────────────────────────────────
-// Replace with your real auth middleware when available.
-// This reads an `x-role` header; in production use JWT / session.
-const adminOnly = (req, res, next) => {
-  const role = (req.headers['x-role'] || '').toLowerCase();
-  if (role !== 'admin') {
-    return res.status(403).json({ success: false, error: 'Admin access required.' });
-  }
-  next();
-};
-
 // ─── Helper: resolve student from DB ─────────────────────────────────────────
-const resolveStudent = async (studentId) => {
+const resolveStudent = async (studentId, tenantId = null) => {
   if (!studentId) return null;
   if (!mongoose.Types.ObjectId.isValid(studentId)) return null;
-  return Student.findOne({ _id: studentId, isDeleted: { $ne: true } });
+  const filter = { _id: studentId, isDeleted: { $ne: true }, ...getTenantFilter(tenantId) };
+  return Student.findOne(filter);
 };
 
 // ─── POST /check ─────────────────────────────────────────────────────────────
-router.post('/check', adminOnly, async (req, res, next) => {
+router.post('/check', requireAuth, async (req, res, next) => {
   try {
     const { studentId, certificateType } = req.body;
 
     if (!studentId || !certificateType) {
-      return res.status(400).json({ success: false, error: 'studentId and certificateType are required.' });
+      return res
+        .status(400)
+        .json({ success: false, error: 'studentId and certificateType are required.' });
     }
 
-    const student = await resolveStudent(studentId);
+    const student = await resolveStudent(studentId, req.tenantId);
     if (!student) {
       return res.status(404).json({ success: false, error: 'Student not found.' });
     }
@@ -75,16 +69,18 @@ router.post('/check', adminOnly, async (req, res, next) => {
 });
 
 // ─── POST /generate ───────────────────────────────────────────────────────────
-router.post('/generate', adminOnly, async (req, res, next) => {
+router.post('/generate', requireAuth, async (req, res, next) => {
   try {
     const { studentId, certificateType } = req.body;
     const requestedBy = req.headers['x-user'] || 'admin';
 
     if (!studentId || !certificateType) {
-      return res.status(400).json({ success: false, error: 'studentId and certificateType are required.' });
+      return res
+        .status(400)
+        .json({ success: false, error: 'studentId and certificateType are required.' });
     }
 
-    const student = await resolveStudent(studentId);
+    const student = await resolveStudent(studentId, req.tenantId);
     if (!student) {
       return res.status(404).json({ success: false, error: 'Student not found.' });
     }
@@ -93,12 +89,12 @@ router.post('/generate', adminOnly, async (req, res, next) => {
 
     // Always log the check attempt
     const history = await EligibilityHistory.create({
-      studentId:            student._id,
-      studentName:          student.fullName,
-      usn:                  student.student_id,
-      certificateType:      result.certificateType,
-      eligible:             result.eligible,
-      failedChecks:         result.failedChecks,
+      studentId: student._id,
+      studentName: student.fullName,
+      usn: student.student_id,
+      certificateType: result.certificateType,
+      eligible: result.eligible,
+      failedChecks: result.failedChecks,
       requestedBy,
       certificateGenerated: result.eligible,
     });
@@ -129,7 +125,7 @@ router.post('/generate', adminOnly, async (req, res, next) => {
 
 // ─── GET /types ───────────────────────────────────────────────────────────────
 // Returns list of supported certificate types and their rule descriptions.
-router.get('/types', adminOnly, (_req, res) => {
+router.get('/types', requireAuth, (_req, res) => {
   const types = Object.entries(CERTIFICATE_RULES).map(([type, rules]) => ({
     type,
     rules: rules.map((r) => r.label),
@@ -138,19 +134,18 @@ router.get('/types', adminOnly, (_req, res) => {
 });
 
 // ─── GET /history ─────────────────────────────────────────────────────────────
-router.get('/history', adminOnly, async (req, res, next) => {
+router.get('/history', requireAuth, async (req, res, next) => {
   try {
     const { studentId, certificateType, eligible, page = 1, limit = 20 } = req.query;
 
-    const filter = {};
+    const filter = { ...getTenantFilter(req.tenantId) };
     if (studentId && mongoose.Types.ObjectId.isValid(studentId)) filter.studentId = studentId;
     if (certificateType) filter.certificateType = { $regex: certificateType, $options: 'i' };
     if (eligible !== undefined) filter.eligible = eligible === 'true';
 
-    const skip  = (Number(page) - 1) * Number(limit);
+    const skip = (Number(page) - 1) * Number(limit);
     const total = await EligibilityHistory.countDocuments(filter);
-    const records = await EligibilityHistory
-      .find(filter)
+    const records = await EligibilityHistory.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
@@ -162,7 +157,7 @@ router.get('/history', adminOnly, async (req, res, next) => {
 });
 
 // ─── GET /history/:studentId ──────────────────────────────────────────────────
-router.get('/history/:studentId', adminOnly, async (req, res, next) => {
+router.get('/history/:studentId', requireAuth, async (req, res, next) => {
   try {
     const { studentId } = req.params;
 
@@ -170,11 +165,31 @@ router.get('/history/:studentId', adminOnly, async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'Invalid studentId.' });
     }
 
-    const records = await EligibilityHistory
-      .find({ studentId })
-      .sort({ createdAt: -1 });
+    const records = await EligibilityHistory.find({ studentId }).sort({ createdAt: -1 });
 
     return res.json({ success: true, count: records.length, records });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── GET /student/:usn/:certificateType ──────────────────────────────────────
+// Public endpoint — no admin header required. Used by student-facing UI.
+router.get('/student/:usn/:certificateType', async (req, res, next) => {
+  try {
+    const { usn, certificateType } = req.params;
+    const studentFilter = {
+      $or: [{ student_id: usn.toUpperCase() }, { email: usn }],
+      isDeleted: { $ne: true },
+      ...getTenantFilter(req.tenantId),
+    };
+    const student = await Student.findOne(studentFilter);
+    if (!student) {
+      // No student found — allow request (eligibility cannot be determined)
+      return res.json({ success: true, eligible: true, failedChecks: [] });
+    }
+    const result = checkEligibility(student, certificateType);
+    return res.json({ success: true, ...result });
   } catch (err) {
     next(err);
   }
