@@ -435,6 +435,7 @@ export default function ScheduleDetailPage() {
     const digits = addForm.phone.replace(/\D/g, '').slice(-10);
     if (!digits || digits.length !== 10) e.phone = '10 digits required';
     if (!addForm.degree) e.degree = 'Required';
+    if (!addForm.program.trim()) e.program = 'Program is required';
     setAddErrors(e);
     if (Object.keys(e).length) return;
 
@@ -448,7 +449,7 @@ export default function ScheduleDetailPage() {
         phone: `+91${digits}`,
         email: addForm.email.trim(),
         scheduleId: schId,
-        program: addForm.program || schedule?.stream || '',
+        program: addForm.program.trim() || 'N/A',
         degree: addForm.degree || schedule?.degree || undefined,
         admissionCategory: str(addForm.admissionCategory),
         term: ti ? ti.term : undefined,

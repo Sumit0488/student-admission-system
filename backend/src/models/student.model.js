@@ -42,6 +42,7 @@ const studentSchema = new mongoose.Schema(
     program: {
       type: String,
       trim: true,
+      required: [true, 'Program is required'],
     },
     degree: {
       type: String,

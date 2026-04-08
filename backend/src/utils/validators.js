@@ -2,7 +2,7 @@ const { AppError } = require('./errorHandler');
 
 // ─── Allowed values ───────────────────────────────────────────────────────────
 const VALID_STATUSES = ['Live', 'Completed', 'Cancelled', 'Detained'];
-const PHONE_REGEX    = /^\+91\d{10}$/;
+const PHONE_REGEX = /^\+91\d{10}$/;
 
 // ─── Validators ───────────────────────────────────────────────────────────────
 
@@ -15,16 +15,16 @@ const validatePhone = (phone) => {
 
 const validateCreateInput = (body) => {
   const { name } = body;
-  if (!name || !name.trim())
-    throw new AppError('Name is required', 400);
+  if (!name || !name.trim()) throw new AppError('Name is required', 400);
+
+  if (!body.program || !body.program.trim()) throw new AppError('Program is required', 400);
 
   const phoneError = validatePhone(body.phone);
   if (phoneError) throw new AppError(phoneError, 400);
 };
 
 const validateStatus = (status) => {
-  if (!status)
-    throw new AppError('Status is required', 400);
+  if (!status) throw new AppError('Status is required', 400);
   if (!VALID_STATUSES.includes(status))
     throw new AppError(`Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`, 400);
 };
