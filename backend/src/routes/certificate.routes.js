@@ -577,7 +577,8 @@ router.post('/templates', async (req, res) => {
 // GET /api/certificates/templates/:id
 router.get('/templates/:id', async (req, res) => {
   try {
-    const tmpl = await CertificateTemplate.findById(req.params.id);
+    const filter = { _id: req.params.id, ...getTenantFilter(req.tenantId) };
+    const tmpl = await CertificateTemplate.findOne(filter);
     if (!tmpl) return res.status(404).json({ success: false, error: 'Template not found' });
     res.json({ success: true, data: withFieldCount(tmpl) });
   } catch (err) {
@@ -605,7 +606,8 @@ router.put('/templates/:id', async (req, res) => {
       // Unset any previously stored fullHtml so old large documents get cleaned up
       $unset: { fullHtml: '' },
     };
-    const tmpl = await CertificateTemplate.findByIdAndUpdate(req.params.id, updateData, {
+    const filter = { _id: req.params.id, ...getTenantFilter(req.tenantId) };
+    const tmpl = await CertificateTemplate.findOneAndUpdate(filter, updateData, {
       new: true,
       runValidators: true,
     });
@@ -632,7 +634,8 @@ router.post('/templates/:id/image', imageUpload.single('image'), async (req, res
         .json({ success: false, error: 'No image file received. Send field name: "image".' });
     }
 
-    const tmpl = await CertificateTemplate.findById(req.params.id);
+    const filter = { _id: req.params.id, ...getTenantFilter(req.tenantId) };
+    const tmpl = await CertificateTemplate.findOne(filter);
     if (!tmpl) return res.status(404).json({ success: false, error: 'Template not found' });
 
     const base64 = req.file.buffer.toString('base64');
@@ -667,7 +670,9 @@ router.post('/templates/:id/image', imageUpload.single('image'), async (req, res
 // DELETE /api/certificates/templates/:id
 router.delete('/templates/:id', async (req, res) => {
   try {
-    await CertificateTemplate.findByIdAndDelete(req.params.id);
+    const filter = { _id: req.params.id, ...getTenantFilter(req.tenantId) };
+    const result = await CertificateTemplate.findOneAndDelete(filter);
+    if (!result) return res.status(404).json({ success: false, error: 'Template not found' });
     res.json({ success: true });
   } catch (err) {
     console.error('DELETE TEMPLATE API ERROR:', err);
@@ -730,7 +735,8 @@ router.post('/issue', async (req, res) => {
     if (!usn?.trim()) return res.status(400).json({ success: false, error: 'USN is required' });
     if (!templateId) return res.status(400).json({ success: false, error: 'Template is required' });
 
-    const tmpl = await CertificateTemplate.findById(templateId);
+    const filter = { _id: templateId, ...getTenantFilter(req.tenantId) };
+    const tmpl = await CertificateTemplate.findOne(filter);
     if (!tmpl) return res.status(404).json({ success: false, error: 'Template not found' });
 
     // Eligibility gate
@@ -845,7 +851,8 @@ router.patch('/:id/approve', async (req, res) => {
     cert = await cert.save();
 
     // Update the associated approval document
-    await Approval.findOneAndUpdate({ certificateRef: cert._id }, { status: 'Approved' });
+    const filter = { certificateRef: cert._id, ...getTenantFilter(req.tenantId) };
+    await Approval.findOneAndUpdate(filter, { status: 'Approved' });
 
     console.log(
       '[Puppeteer] Successfully updated certificate status to "Approved". (PDF will generate on download)'
@@ -865,7 +872,8 @@ router.patch('/:id/reject', async (req, res) => {
       { status: 'Rejected' },
       { new: true }
     );
-    await Approval.findOneAndUpdate({ certificateRef: cert._id }, { status: 'Rejected' });
+    const filter = { certificateRef: cert._id, ...getTenantFilter(req.tenantId) };
+    await Approval.findOneAndUpdate(filter, { status: 'Rejected' });
     res.json({ success: true, data: cert });
   } catch (err) {
     console.error('REJECT API ERROR:', err);
@@ -1067,12 +1075,10 @@ function escHtml(str) {
 // Accepts a PDF (field name: "pdf"), extracts text via OCR, returns HTML for the editor.
 router.post('/templates/upload-pdf', pdfUpload.single('pdf'), async (req, res) => {
   if (!req.file) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        error: 'No PDF file uploaded. Send the file under the field name "pdf".',
-      });
+    return res.status(400).json({
+      success: false,
+      error: 'No PDF file uploaded. Send the file under the field name "pdf".',
+    });
   }
   if (req.file.mimetype !== 'application/pdf') {
     return res.status(400).json({ success: false, error: 'Only PDF files are accepted.' });
