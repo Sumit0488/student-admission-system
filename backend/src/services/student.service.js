@@ -313,7 +313,11 @@ const exportStudents = async (query = {}, tenantId = null) => {
   const { program = '' } = query;
 
   const filter = { ...tenantFilter(tenantId), isDeleted: { $ne: true }, admissionStatus: 'Live' };
-  if (program) filter.program = program;
+  // Case-insensitive exact match so "B.E CSE" and "Computer Science and Engineering" both work
+  if (program)
+    filter.program = {
+      $regex: new RegExp(`^${program.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+    };
 
   const students = await Student.find(filter)
     .sort({ program: 1, student_id: 1 })

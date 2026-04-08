@@ -1281,8 +1281,13 @@ export default function StudentsPage() {
     }
   };
 
-  // ── Derived data ── (use config so options are always complete even after filtering)
-  const programs = useMemo(() => config.programs, [config.programs]);
+  // ── Derived data ──
+  // filterPrograms comes from GET /api/students/programs — actual values in the DB.
+  // Fall back to config.programs (from /api/config) only if not yet loaded.
+  const programs = useMemo(
+    () => (filterPrograms.length > 0 ? filterPrograms : config.programs),
+    [filterPrograms, config.programs]
+  );
   const batches = useMemo(() => config.batches, [config.batches]);
 
   // Backend returns exactly one page of results; paginated === students from API
