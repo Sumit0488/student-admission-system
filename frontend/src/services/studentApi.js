@@ -3,13 +3,17 @@ import api from './api';
 const API = '/api/students';
 
 export const getStudents = async (params = {}) => {
-  console.log('GET ALL STUDENTS', params);
   return await api.get(API, { params });
 };
 
 export const getStatusCounts = async () => {
-  console.log('GET STATUS COUNTS');
   return await api.get(`${API}/counts`);
+};
+
+// Merged endpoint: counts + first page of Live students in one round trip.
+// Use on initial Students page load to cut latency roughly in half.
+export const getStudentsDashboard = async (params = {}) => {
+  return await api.get(`${API}/dashboard`, { params });
 };
 
 export const getStudentById = async (id) => {

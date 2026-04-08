@@ -4,6 +4,7 @@ const {
   createStudent,
   getStudents,
   getStatusCounts,
+  getDashboard,
   getStudentById,
   exportStudents,
   exportFullReport,
@@ -109,6 +110,7 @@ router.post('/migrate/backfill-degree', async (req, res) => {
 // NOTE: static paths (/search, /counts, /export) must be BEFORE /:id
 router.get('/search', searchStudents); // GET  /api/students/search?name=
 router.get('/counts', getStatusCounts); // GET  /api/students/counts
+router.get('/dashboard', getDashboard); // GET  /api/students/dashboard (counts + live list merged)
 router.get('/programs', getDistinctPrograms); // GET  /api/students/programs
 router.get('/export', exportStudents); // GET  /api/students/export?program=
 router.get('/export/report', exportFullReport); // GET  /api/students/export/report
