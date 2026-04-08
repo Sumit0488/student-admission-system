@@ -1,5 +1,7 @@
 'use strict';
 
+const mongoose = require('mongoose');
+
 /**
  * getTenantFilter(tenantId)
  *
@@ -7,12 +9,9 @@
  *   1. Documents that belong to the given tenant (tenantId matches), AND
  *   2. Legacy documents that have no tenantId stored yet (null or absent field).
  *
- * Uses { tenantId: { $in: [tenantId, null] } } — MongoDB's $in with null
- * matches both explicit null values and fields that don't exist, so old
- * records without tenantId are always included.
- *
- * This avoids $or at the top level, so the returned fragment can be safely
- * spread into a filter that already uses $or for search queries.
+ * IMPORTANT: tenantId is cast to ObjectId so this filter works correctly in
+ * BOTH Mongoose find() (which would auto-cast) AND aggregate() pipelines
+ * (which bypass Mongoose schema casting and compare types strictly).
  *
  * When tenantId is null/undefined (unauthenticated or pre-auth request),
  * returns {} so the caller sees ALL documents.
@@ -22,7 +21,10 @@
  */
 function getTenantFilter(tenantId) {
   if (!tenantId) return {};
-  return { tenantId: { $in: [tenantId, null] } };
+  const tid = mongoose.Types.ObjectId.isValid(tenantId)
+    ? new mongoose.Types.ObjectId(String(tenantId))
+    : tenantId;
+  return { tenantId: { $in: [tid, null] } };
 }
 
 module.exports = { getTenantFilter };
