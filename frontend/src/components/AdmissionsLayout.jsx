@@ -1,16 +1,36 @@
+import { useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { ClipboardList, Calendar, CheckSquare, Award } from 'lucide-react';
+import {
+  getSchedules,
+  getCertificates,
+  getTemplates,
+  getAllCertificateRequests,
+} from '../services/admissionsApi';
 
 const TABS = [
-  { label: 'Enquiry',             path: '/admin/admissions/enquiry',   icon: ClipboardList },
-  { label: 'Admission Schedules', path: '/admin/admissions/schedules', icon: Calendar      },
-  { label: 'Approvals',           path: '/admin/admissions/approvals', icon: CheckSquare   },
-  { label: 'Certificates',        path: '/admin/certificates',         icon: Award         },
+  { label: 'Enquiry', path: '/admin/admissions/enquiry', icon: ClipboardList },
+  { label: 'Admission Schedules', path: '/admin/admissions/schedules', icon: Calendar },
+  { label: 'Approvals', path: '/admin/admissions/approvals', icon: CheckSquare },
+  { label: 'Certificates', path: '/admin/certificates', icon: Award },
 ];
 
 // Sub-layout: just the admissions tab strip + outlet.
 // The full page shell (sidebar, navbar, dark mode) is provided by the parent Layout.
 export default function AdmissionsLayout() {
+  // Warm the cache for all tabs the moment the layout mounts.
+  // Pages will find cached data and render instantly without showing skeletons.
+  useEffect(() => {
+    Promise.all([
+      getSchedules(),
+      getCertificates(),
+      getTemplates(),
+      getAllCertificateRequests(),
+    ]).catch(() => {
+      /* prefetch errors are silent — pages handle their own errors */
+    });
+  }, []);
+
   return (
     <div className="flex flex-col min-h-0">
       {/* Tab strip */}
@@ -23,9 +43,10 @@ export default function AdmissionsLayout() {
                 to={path}
                 className={({ isActive }) =>
                   `flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors
-                   ${isActive
-                     ? 'bg-blue-600 text-white shadow-sm'
-                     : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'
+                   ${
+                     isActive
+                       ? 'bg-blue-600 text-white shadow-sm'
+                       : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'
                    }`
                 }
               >

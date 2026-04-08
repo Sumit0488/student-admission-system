@@ -23,6 +23,7 @@ import {
   getAllCertificateRequests,
   updateCertificateRequest,
 } from '../../services/admissionsApi';
+import qc from '../../services/queryCache';
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 function useToast() {
@@ -158,19 +159,19 @@ export default function CertificatesPage() {
   );
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  const [certs, setCerts] = useState([]);
-  const [templates, setTemplates] = useState([]);
-  const [certLoad, setCertLoad] = useState(true);
-  const [tmplLoad, setTmplLoad] = useState(true);
+  const [certs, setCerts] = useState(() => qc.get('certificates')?.data || []);
+  const [templates, setTemplates] = useState(() => qc.get('templates')?.data || []);
+  const [certLoad, setCertLoad] = useState(() => !qc.has('certificates'));
+  const [tmplLoad, setTmplLoad] = useState(() => !qc.has('templates'));
   const [dlId, setDlId] = useState(null);
 
   // Certificate requests (student-submitted) — used by Approvals tab
-  const [certRequests, setCertRequests] = useState([]);
-  const [reqLoad, setReqLoad] = useState(true);
+  const [certRequests, setCertRequests] = useState(() => qc.get('certRequests')?.data || []);
+  const [reqLoad, setReqLoad] = useState(() => !qc.has('certRequests'));
   const [reqUpdating, setReqUpdating] = useState(null);
 
   const fetchCerts = useCallback(async () => {
-    setCertLoad(true);
+    if (!qc.has('certificates')) setCertLoad(true);
     try {
       const { data } = await getCertificates();
       setCerts(data.data || []);
@@ -182,7 +183,7 @@ export default function CertificatesPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchTemplates = useCallback(async () => {
-    setTmplLoad(true);
+    if (!qc.has('templates')) setTmplLoad(true);
     try {
       const { data } = await getTemplates();
       setTemplates(data.data || []);
@@ -194,7 +195,7 @@ export default function CertificatesPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchCertRequests = useCallback(async () => {
-    setReqLoad(true);
+    if (!qc.has('certRequests')) setReqLoad(true);
     try {
       const { data } = await getAllCertificateRequests();
       setCertRequests(data.data || []);

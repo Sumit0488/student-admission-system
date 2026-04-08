@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Search, CheckCircle, XCircle, AlertCircle, Clock, FileText, X } from 'lucide-react';
 import { getAllCertificateRequests, updateCertificateRequest } from '../../services/admissionsApi';
+import qc from '../../services/queryCache';
 
 const FILTERS = ['All', 'Pending', 'Approved', 'Rejected'];
 
@@ -91,15 +92,17 @@ function RejectModal({ onConfirm, onCancel, loading }) {
 
 // ── Student Requests tab ────────────────────────────────────────────────────
 function StudentRequestsTab({ toast }) {
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const isInitial = (s, q) => s === 'All' && q === '';
+  const [requests, setRequests] = useState(() => qc.get('certRequests')?.data || []);
+  const [loading, setLoading] = useState(() => !qc.has('certRequests'));
   const [statusFilter, setStatusFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [updating, setUpdating] = useState(null);
   const [rejectTarget, setRejectTarget] = useState(null); // { id }
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    const initial = isInitial(statusFilter, search);
+    if (!initial || !qc.has('certRequests')) setLoading(true);
     try {
       const params = { q: search };
       if (statusFilter !== 'All') params.status = statusFilter;
