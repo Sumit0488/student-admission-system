@@ -8,6 +8,10 @@
 const mongoose = require('mongoose');
 const app      = require('../backend/src/app');
 
+// Increase buffer timeout so queries don't fail before the Atlas connection
+// is established on cold starts (Vercel serverless)
+mongoose.set('bufferTimeoutMS', 30000);
+
 // ─── Connection cache ─────────────────────────────────────────────────────────
 // null  → no connection attempt yet
 // Promise → connection in progress or resolved
@@ -39,9 +43,9 @@ function ensureConnected() {
     connectionPromise = mongoose
       .connect(uri, {
         family:                   4,      // force IPv4 — avoids IPv6 SRV lookup issues
-        serverSelectionTimeoutMS: 10000,
-        socketTimeoutMS:          45000,
-        connectTimeoutMS:         10000,
+        serverSelectionTimeoutMS: 25000,
+        socketTimeoutMS:          55000,
+        connectTimeoutMS:         25000,
       })
       .then((conn) => {
         console.log(`✅ [DB] Connected to MongoDB: ${conn.connection.host}`);
