@@ -44,8 +44,9 @@ const globalErrorHandler = (err, _req, res, _next) => {
     return res.status(err.statusCode).json({ success: false, error: err.message });
   }
 
-  // Unexpected errors — log and return generic message
-  console.error('SERVER ERROR:', err);
+  // Unexpected errors — log full stack to help diagnose the exact source
+  console.error('SERVER ERROR:', err.message);
+  console.error('STACK:', err.stack);
 
   res.status(500).json({
     success: false,

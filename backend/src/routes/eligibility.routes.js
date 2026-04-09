@@ -41,7 +41,7 @@ const resolveStudent = async (studentId, tenantId = null) => {
 };
 
 // ─── POST /check ─────────────────────────────────────────────────────────────
-router.post('/check', requireAuth, async (req, res, next) => {
+router.post('/check', requireAuth, async (req, res) => {
   try {
     const { studentId, certificateType } = req.body;
 
@@ -64,12 +64,13 @@ router.post('/check', requireAuth, async (req, res, next) => {
       ...result,
     });
   } catch (err) {
-    next(err);
+    console.error('[Eligibility]', err.message, err.stack);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // ─── POST /generate ───────────────────────────────────────────────────────────
-router.post('/generate', requireAuth, async (req, res, next) => {
+router.post('/generate', requireAuth, async (req, res) => {
   try {
     const { studentId, certificateType } = req.body;
     const requestedBy = req.headers['x-user'] || 'admin';
@@ -119,7 +120,8 @@ router.post('/generate', requireAuth, async (req, res, next) => {
       message: 'Student is eligible. Proceed to generate the certificate via /api/certificates.',
     });
   } catch (err) {
-    next(err);
+    console.error('[Eligibility]', err.message, err.stack);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -134,7 +136,7 @@ router.get('/types', requireAuth, (_req, res) => {
 });
 
 // ─── GET /history ─────────────────────────────────────────────────────────────
-router.get('/history', requireAuth, async (req, res, next) => {
+router.get('/history', requireAuth, async (req, res) => {
   try {
     const { studentId, certificateType, eligible, page = 1, limit = 20 } = req.query;
 
@@ -152,12 +154,13 @@ router.get('/history', requireAuth, async (req, res, next) => {
 
     res.json({ success: true, total, page: Number(page), limit: Number(limit), records });
   } catch (err) {
-    next(err);
+    console.error('[Eligibility]', err.message, err.stack);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // ─── GET /history/:studentId ──────────────────────────────────────────────────
-router.get('/history/:studentId', requireAuth, async (req, res, next) => {
+router.get('/history/:studentId', requireAuth, async (req, res) => {
   try {
     const { studentId } = req.params;
 
@@ -169,13 +172,14 @@ router.get('/history/:studentId', requireAuth, async (req, res, next) => {
 
     return res.json({ success: true, count: records.length, records });
   } catch (err) {
-    next(err);
+    console.error('[Eligibility]', err.message, err.stack);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // ─── GET /student/:usn/:certificateType ──────────────────────────────────────
 // Public endpoint — no admin header required. Used by student-facing UI.
-router.get('/student/:usn/:certificateType', async (req, res, next) => {
+router.get('/student/:usn/:certificateType', async (req, res) => {
   try {
     const { usn, certificateType } = req.params;
     const studentFilter = {
@@ -191,7 +195,8 @@ router.get('/student/:usn/:certificateType', async (req, res, next) => {
     const result = checkEligibility(student, certificateType);
     return res.json({ success: true, ...result });
   } catch (err) {
-    next(err);
+    console.error('[Eligibility]', err.message, err.stack);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

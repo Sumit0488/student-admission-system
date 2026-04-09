@@ -38,10 +38,11 @@ const CORS_OPTS = {
 };
 
 // Allow max 100 requests per IP per minute across all API routes
+// express-rate-limit v8: use `limit` (not `max`) and `standardHeaders: 'draft-7'`
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 100,
-  standardHeaders: true,
+  limit: 100,
+  standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { success: false, error: 'Too many requests — please slow down.' },
 });
