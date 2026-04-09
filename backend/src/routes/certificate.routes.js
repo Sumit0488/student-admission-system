@@ -961,10 +961,15 @@ router.get('/pdf/:id', async (req, res) => {
       '</head>',
       '<style>' +
         '@page{margin:0!important;size:A4 portrait;}' +
-        'html,body{margin:0;padding:0;width:794px;font-family:Arial,sans-serif;}' +
+        // Full-width html/body — DO NOT fix to 794px; let the A4 @page rule
+        // define the width so margin:auto on .page centres correctly.
+        'html{margin:0;padding:0;width:100%;}' +
+        'body{margin:0;padding:0;width:100%;display:flex;justify-content:center;' +
+        'font-family:Arial,sans-serif;}' +
         '.page{width:794px!important;min-height:1123px!important;height:auto!important;' +
         'overflow:visible!important;box-sizing:border-box!important;' +
-        'padding:60px 70px!important;page-break-after:avoid!important;}' +
+        'padding:60px 70px!important;page-break-after:avoid!important;' +
+        'margin:0 auto!important;}' +
         'p{margin:6px 0!important;line-height:1.7!important;}' +
         'p:empty::before{content:"\\00a0";}' +
         '*{page-break-inside:avoid!important;break-inside:avoid!important;}' +
@@ -975,7 +980,6 @@ router.get('/pdf/:id', async (req, res) => {
 
     // Measure the actual rendered height of .page and compute a scale factor
     // so the content always fits within a single A4 page (1123 px at 96 DPI).
-    // If content is shorter than 1123 px, scale stays 1 (no upscaling).
     const A4_PX = 1123;
     const contentHeight = await page.evaluate(() => {
       const el = document.querySelector('.page');
@@ -984,10 +988,21 @@ router.get('/pdf/:id', async (req, res) => {
     const scale = contentHeight > A4_PX ? parseFloat((A4_PX / contentHeight).toFixed(4)) : 1;
     console.log(`[PDF] content height: ${contentHeight}px  →  scale: ${scale}`);
 
+    // Apply scaling via CSS zoom instead of page.pdf({scale}).
+    // page.pdf({scale < 1}) anchors from the top-left, leaving blank space on
+    // the right equal to (1 - scale) × pageWidth.  CSS zoom shrinks the element
+    // while the flex body keeps it horizontally centred.
+    if (scale < 1) {
+      await page.evaluate((s) => {
+        const el = document.querySelector('.page');
+        if (el) el.style.zoom = String(s);
+      }, scale);
+    }
+
     const pdfRaw = await page.pdf({
       format: 'A4',
       printBackground: true,
-      scale,
+      scale: 1, // always 1 — scaling is handled via CSS zoom above
       margin: { top: '0', bottom: '0', left: '0', right: '0' },
     });
     const pdfBuffer = Buffer.isBuffer(pdfRaw) ? pdfRaw : Buffer.from(pdfRaw);
