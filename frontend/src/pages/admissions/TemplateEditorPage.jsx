@@ -368,14 +368,13 @@ export default function TemplateEditorPage() {
     const bannerImgs = headerImgs.filter((img) => img.width >= BANNER_W);
     const logoImgs = headerImgs.filter((img) => img.width < BANNER_W);
 
-    // Banner — negative margins cancel the .page padding so the image reaches
-    // the physical edge of the page (top + left + right).
+    // Banner — sits directly in .page which has padding:0, so width:100% = full page width.
+    // No negative-margin hacks needed.
     const bannerHtml = bannerImgs
       .map(
         (img) =>
-          `<div style="margin:-${PAD_TOP}px -${PAD_SIDE}px 12px -${PAD_SIDE}px;` +
-          `width:calc(100% + ${PAD_SIDE * 2}px);line-height:0;overflow:hidden;">` +
-          `<img src="${img.src}" style="width:100%;max-width:none;display:block;" /></div>`
+          `<div style="width:100%;line-height:0;overflow:hidden;display:block;">` +
+          `<img src="${img.src}" style="width:100%;display:block;" /></div>`
       )
       .join('');
 
@@ -417,38 +416,33 @@ export default function TemplateEditorPage() {
   <meta charset="UTF-8" />
   <style>
     @page { margin: 0; size: A4 portrait; }
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
+    body { margin: 0; font-family: Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    /* .page has NO padding — banner gets natural 100% width without any hacks */
     .page {
       width: 794px;
-      min-height: 1123px;   /* A4 height as minimum — content can grow beyond */
-      height: auto;         /* let content dictate actual height               */
+      min-height: 1123px;
+      height: auto;
       margin: auto;
-      padding: 60px 70px;
+      padding: 0;
       box-sizing: border-box;
       position: relative;
       background: white;
-      overflow: visible;    /* never clip — Puppeteer handles multi-page flow  */
+      overflow: visible;
+    }
+    /* All padding lives inside .page-body */
+    .page-body {
+      padding: ${PAD_TOP}px ${PAD_SIDE}px;
       font-size: 14px;
       line-height: 1.7;
     }
     .center { text-align: center; }
-    /* Table-based row is more reliable than flex in Puppeteer's print context.
-       flex can squeeze the container width slightly, wrapping the right-side
-       element (e.g. Date) onto a new line.  Table cells never wrap. */
-    .row          { display: table; width: 100%; table-layout: fixed; }
-    .row > *      { display: table-cell; vertical-align: top; white-space: nowrap; }
+    .row { display: table; width: 100%; table-layout: fixed; }
+    .row > * { display: table-cell; vertical-align: top; white-space: nowrap; }
     .row > *:last-child { text-align: right; }
     .page-break { page-break-after: always; break-after: page; }
     table { width: 100%; border-collapse: collapse; margin: 12px 0; }
     th, td { border: 1px solid #cbd5e1; padding: 8px 12px; vertical-align: top; }
     th { background: #f8fafc; font-weight: 600; text-align: left; }
-    /* Match editor paragraph spacing ([&_p]:my-1.5 = 6px top + 6px bottom).
-       Also preserve empty-paragraph height so they don't collapse in print. */
     p { margin: 6px 0; }
     p:empty::before { content: '\\00a0'; }
   </style>
@@ -456,8 +450,10 @@ export default function TemplateEditorPage() {
 <body>
   <div class="page">
     ${bannerHtml}
-    ${headerTableHtml}
-    ${rawNotes || ''}
+    <div class="page-body">
+      ${headerTableHtml}
+      ${rawNotes || ''}
+    </div>
     ${imgsHtml}
   </div>
 </body>

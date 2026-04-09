@@ -457,12 +457,13 @@ function buildTemplateHtml(tmpl) {
   const bannerImgs = headerImgs.filter((img) => img.width >= BANNER_W);
   const logoImgs = headerImgs.filter((img) => img.width < BANNER_W);
 
+  // Banner sits directly in .page (which now has padding:0), so width:100%
+  // is the full 210mm page width — no negative-margin hacks needed.
   const bannerHtml = bannerImgs
     .map(
       (img) =>
-        `<div style="margin:-${PAD_TOP}px -${PAD_SIDE}px 12px -${PAD_SIDE}px;` +
-        `width:calc(100% + ${PAD_SIDE * 2}px);line-height:0;overflow:hidden;">` +
-        `<img src="${img.src}" style="width:100%;max-width:none;display:block;" /></div>`
+        `<div style="width:100%;line-height:0;overflow:hidden;display:block;">` +
+        `<img src="${img.src}" style="width:100%;display:block;" /></div>`
     )
     .join('');
 
@@ -496,6 +497,10 @@ function buildTemplateHtml(tmpl) {
     )
     .join('');
 
+  const bodyContent = notes.trim()
+    ? notes
+    : '<p style="color:#c00;font-size:13px;border:1px dashed #c00;padding:8px;">⚠ Template body is empty — open the template editor and add certificate content, then re-issue.</p>';
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -503,11 +508,15 @@ function buildTemplateHtml(tmpl) {
   <style>
     @page { margin: 0; size: A4 portrait; }
     body { margin: 0 !important; padding: 0 !important; font-family: Arial, sans-serif; color: #000 !important; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .page { width: 210mm !important; min-height: 297mm; height: auto; margin: 0 auto !important; padding: 60px 70px; box-sizing: border-box !important; position: relative; background: white; overflow: visible; font-size: 14px; line-height: 1.7; color: #000 !important; }
-    .page * { color: #000 !important; background-color: transparent !important; visibility: visible !important; opacity: 1 !important; }
-    .page img { background-color: initial !important; }
-    /* Force all text elements visible — overrides any display:none, hidden, or zero-opacity from pasted/dark-mode content */
-    .page p, .page div, .page span, .page h1, .page h2, .page h3, .page h4, .page li, .page td, .page th, .page font { display: revert; visibility: visible !important; opacity: 1 !important; }
+    /* .page has NO padding — banner gets natural 100% width with no hacks */
+    .page { width: 210mm !important; min-height: 297mm; height: auto; margin: 0 auto !important; padding: 0 !important; box-sizing: border-box !important; position: relative; background: white; overflow: visible; color: #000 !important; }
+    /* All padding lives in .page-body, keeping it separate from the banner */
+    .page-body { padding: ${PAD_TOP}px ${PAD_SIDE}px; font-size: 14px; line-height: 1.7; }
+    .page-body * { color: #000 !important; background-color: transparent !important; visibility: visible !important; opacity: 1 !important; }
+    .page-body img { background-color: initial !important; }
+    .page-body p, .page-body div, .page-body span,
+    .page-body h1, .page-body h2, .page-body h3, .page-body h4,
+    .page-body li, .page-body td, .page-body th, .page-body font { display: revert; visibility: visible !important; opacity: 1 !important; }
     .center { text-align: center; }
     .row { display: table; width: 100%; table-layout: fixed; }
     .row > * { display: table-cell; vertical-align: top; white-space: nowrap; }
@@ -518,15 +527,15 @@ function buildTemplateHtml(tmpl) {
     th { background: #f8fafc; font-weight: 600; text-align: left; }
     p { margin: 6px 0; }
     p:empty::before { content: '\\00a0'; }
-    .header { width: 100% !important; }
-    .header img { width: 100% !important; display: block; }
   </style>
 </head>
 <body>
   <div class="page">
     ${bannerHtml}
-    ${headerTableHtml}
-    ${notes.trim() ? notes : '<p style="color:#c00;font-size:13px;border:1px dashed #c00;padding:8px;">⚠ Template body is empty — open the template editor and add certificate content, then re-issue.</p>'}
+    <div class="page-body">
+      ${headerTableHtml}
+      ${bodyContent}
+    </div>
     ${imgsHtml}
   </div>
 </body>
@@ -990,19 +999,16 @@ router.get('/pdf/:id', async (req, res) => {
         'color:#000!important;background:white;}' +
         '.page{width:210mm!important;min-height:297mm!important;height:auto!important;' +
         'overflow:visible!important;box-sizing:border-box!important;' +
-        'padding:60px 70px!important;page-break-after:avoid!important;' +
-        'margin:0 auto!important;color:#000!important;background:white!important;}' +
-        '.page *{color:#000!important;background-color:transparent!important;' +
+        'padding:0!important;margin:0 auto!important;background:white!important;}' +
+        '.page-body{padding:60px 70px!important;font-size:14px;line-height:1.7;}' +
+        '.page-body *{color:#000!important;background-color:transparent!important;' +
         'visibility:visible!important;opacity:1!important;}' +
-        '.page img{background-color:initial!important;}' +
-        '.page p,.page div,.page span,.page h1,.page h2,.page h3,.page h4,' +
-        '.page li,.page td,.page th,.page font{display:revert;' +
-        'visibility:visible!important;opacity:1!important;}' +
-        '.header{width:100%!important;}' +
-        '.header img{width:100%!important;display:block;}' +
+        '.page-body img{background-color:initial!important;}' +
+        '.page-body p,.page-body div,.page-body span,.page-body h1,.page-body h2,' +
+        '.page-body h3,.page-body h4,.page-body li,.page-body td,.page-body th,' +
+        '.page-body font{display:revert;visibility:visible!important;opacity:1!important;}' +
         'p{margin:6px 0!important;line-height:1.7!important;}' +
         'p:empty::before{content:"\\00a0";}' +
-        'img{max-width:100%;}' +
         '.page-break{page-break-after:always!important;break-after:page!important;}' +
         '</style></head>'
     );
