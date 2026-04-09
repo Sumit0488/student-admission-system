@@ -25,28 +25,28 @@ const connectDB = async () => {
   if (mongoose.connection.readyState === 1) return Promise.resolve(mongoose.connection);
 
   // Broken/disconnected — clear the stale promise and reconnect
-  if (
-    connectionPromise &&
-    [0, 3].includes(mongoose.connection.readyState)
-  ) {
+  if (connectionPromise && [0, 3].includes(mongoose.connection.readyState)) {
     connectionPromise = null;
   }
 
   if (!connectionPromise) {
     console.log('[DB] Opening new MongoDB connection in connectDB...');
-    connectionPromise = mongoose.connect(uri, {
-      family: 4,                    // Force IPv4 at the TCP socket level
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
-      connectTimeoutMS: 10000,
-    }).then((conn) => {
-      console.log(`✅ MongoDB connected: ${conn.connection.host}`);
-      return conn;
-    }).catch((err) => {
-      console.error('❌ MongoDB connection error:', err.message);
-      connectionPromise = null; // reset so next request retries
-      throw err;
-    });
+    connectionPromise = mongoose
+      .connect(uri, {
+        family: 4, // Force IPv4 at the TCP socket level
+        serverSelectionTimeoutMS: 30000,
+        socketTimeoutMS: 60000,
+        connectTimeoutMS: 30000,
+      })
+      .then((conn) => {
+        console.log(`✅ MongoDB connected: ${conn.connection.host}`);
+        return conn;
+      })
+      .catch((err) => {
+        console.error('❌ MongoDB connection error:', err.message);
+        connectionPromise = null; // reset so next request retries
+        throw err;
+      });
   }
 
   return connectionPromise;
