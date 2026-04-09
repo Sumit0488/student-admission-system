@@ -6,11 +6,12 @@
  */
 
 const mongoose = require('mongoose');
-const app      = require('../backend/src/app');
 
-// Increase buffer timeout so queries don't fail before the Atlas connection
-// is established on cold starts (Vercel serverless)
+// Must be set BEFORE any models are loaded (before require app)
+// so queries buffer long enough for Atlas cold-start connections
 mongoose.set('bufferTimeoutMS', 30000);
+
+const app = require('../backend/src/app');
 
 // ─── Connection cache ─────────────────────────────────────────────────────────
 // null  → no connection attempt yet
