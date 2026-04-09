@@ -24,6 +24,7 @@ import {
   Lock,
   Unlock,
   AlignCenter as CenterIcon,
+  Maximize2,
 } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import { getTemplate, createTemplate, updateTemplate } from '../../services/admissionsApi';
@@ -745,21 +746,35 @@ export default function TemplateEditorPage() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
-      setImages((prev) => [
-        ...prev,
-        {
-          id,
-          src: ev.target.result,
-          x: 60,
-          y: 60,
-          width: 200,
-          height: 150,
-          pageIndex: activePage,
-          locked: false,
-        },
-      ]);
-      setSelectedImg(id);
-      triggerAutoSave();
+      const PAGE_W = 794;
+      const BANNER_W = Math.round(PAGE_W * 0.7); // 556px — same threshold as buildFullHtml
+      const imgEl = new window.Image();
+      imgEl.onload = () => {
+        const nw = imgEl.naturalWidth || PAGE_W;
+        const nh = imgEl.naturalHeight || 150;
+        // Wide images (≥ banner threshold) are likely letterheads — auto-fit as banner
+        const isBanner = nw >= BANNER_W;
+        const width = isBanner ? PAGE_W : Math.min(nw, PAGE_W);
+        const height = isBanner ? Math.round((PAGE_W * nh) / nw) : Math.min(nh, 400);
+        setImages((prev) => [
+          ...prev,
+          {
+            id,
+            src: ev.target.result,
+            x: isBanner ? 0 : 60,
+            y: isBanner ? 0 : 60,
+            width,
+            height,
+            naturalWidth: nw,
+            naturalHeight: nh,
+            pageIndex: activePage,
+            locked: false,
+          },
+        ]);
+        setSelectedImg(id);
+        triggerAutoSave();
+      };
+      imgEl.src = ev.target.result;
     };
     reader.readAsDataURL(file);
   };
@@ -777,6 +792,21 @@ export default function TemplateEditorPage() {
       prev.map((img) => {
         if (img.id !== id) return img;
         return { ...img, x: Math.round((794 - img.width) / 2) };
+      })
+    );
+  };
+
+  // Snap image to full page width at the top — renders as a full-bleed banner in the PDF.
+  // Height is scaled proportionally using the natural image dimensions.
+  const fitAsBanner = (id) => {
+    const PAGE_W = 794;
+    setImages((prev) =>
+      prev.map((img) => {
+        if (img.id !== id) return img;
+        const nw = img.naturalWidth || img.width;
+        const nh = img.naturalHeight || img.height;
+        const h = nw > 0 ? Math.round((PAGE_W * nh) / nw) : img.height;
+        return { ...img, x: 0, y: 0, width: PAGE_W, height: h, locked: false };
       })
     );
   };
@@ -1453,6 +1483,17 @@ export default function TemplateEditorPage() {
                                 className={`absolute -top-7 left-0 flex items-center gap-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg shadow-md px-1.5 py-1 transition-opacity
                                 ${selectedImg === img.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                               >
+                                <button
+                                  type="button"
+                                  title="Fit as full-width header banner (snaps to top, fills page width)"
+                                  onClick={() => {
+                                    fitAsBanner(img.id);
+                                    triggerAutoSave();
+                                  }}
+                                  className="p-0.5 rounded text-gray-500 hover:text-green-600 transition-colors"
+                                >
+                                  <Maximize2 size={12} />
+                                </button>
                                 <button
                                   type="button"
                                   title="Center horizontally"
