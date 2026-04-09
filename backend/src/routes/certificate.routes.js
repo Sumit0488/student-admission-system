@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 // const pdfParse             = require('pdf-parse');
+// v143.0.0 and v143.0.4 have no GitHub release assets — v133.0.0 is the
+// latest version confirmed available at the Sparticuz/chromium repository.
 const CHROMIUM_URL =
-  'https://github.com/Sparticuz/chromium/releases/download/v143.0.0/chromium-v143.0.0-pack.tar';
+  'https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar';
 
 // Lazy-load heavy PDF deps — prevents startup crash if not installed
 async function getLaunchOptions() {
@@ -501,8 +503,10 @@ function buildTemplateHtml(tmpl) {
     @page { margin: 0; size: A4 portrait; }
     body { margin: 0 !important; padding: 0 !important; font-family: Arial, sans-serif; color: #000 !important; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .page { width: 210mm !important; min-height: 297mm; height: auto; margin: 0 auto !important; padding: 60px 70px; box-sizing: border-box !important; position: relative; background: white; overflow: visible; font-size: 14px; line-height: 1.7; color: #000 !important; }
-    .page * { color: #000 !important; background-color: transparent !important; }
+    .page * { color: #000 !important; background-color: transparent !important; visibility: visible !important; opacity: 1 !important; }
     .page img { background-color: initial !important; }
+    /* Force all text elements visible — overrides any display:none, hidden, or zero-opacity from pasted/dark-mode content */
+    .page p, .page div, .page span, .page h1, .page h2, .page h3, .page h4, .page li, .page td, .page th, .page font { display: revert; visibility: visible !important; opacity: 1 !important; }
     .center { text-align: center; }
     .row { display: table; width: 100%; table-layout: fixed; }
     .row > * { display: table-cell; vertical-align: top; white-space: nowrap; }
@@ -521,7 +525,7 @@ function buildTemplateHtml(tmpl) {
   <div class="page">
     ${bannerHtml}
     ${headerTableHtml}
-    ${notes}
+    ${notes.trim() ? notes : '<p style="color:#c00;font-size:13px;border:1px dashed #c00;padding:8px;">⚠ Template body is empty — open the template editor and add certificate content, then re-issue.</p>'}
     ${imgsHtml}
   </div>
 </body>
@@ -987,8 +991,12 @@ router.get('/pdf/:id', async (req, res) => {
         'overflow:visible!important;box-sizing:border-box!important;' +
         'padding:60px 70px!important;page-break-after:avoid!important;' +
         'margin:0 auto!important;color:#000!important;background:white!important;}' +
-        '.page *{color:#000!important;background-color:transparent!important;}' +
+        '.page *{color:#000!important;background-color:transparent!important;' +
+        'visibility:visible!important;opacity:1!important;}' +
         '.page img{background-color:initial!important;}' +
+        '.page p,.page div,.page span,.page h1,.page h2,.page h3,.page h4,' +
+        '.page li,.page td,.page th,.page font{display:revert;' +
+        'visibility:visible!important;opacity:1!important;}' +
         '.header{width:100%!important;}' +
         '.header img{width:100%!important;display:block;}' +
         'p{margin:6px 0!important;line-height:1.7!important;}' +
