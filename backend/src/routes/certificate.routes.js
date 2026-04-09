@@ -499,9 +499,9 @@ function buildTemplateHtml(tmpl) {
   <meta charset="UTF-8" />
   <style>
     @page { margin: 0; size: A4 portrait; }
-    * { max-width: none !important; box-sizing: border-box; }
-    body { margin: 0 !important; padding: 0 !important; font-family: Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .page { width: 210mm !important; min-height: 297mm; height: auto; margin: 0 auto !important; padding: 60px 70px; box-sizing: border-box !important; position: relative; background: white; overflow: visible; font-size: 14px; line-height: 1.7; }
+    body { margin: 0 !important; padding: 0 !important; font-family: Arial, sans-serif; color: #000 !important; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { width: 210mm !important; min-height: 297mm; height: auto; margin: 0 auto !important; padding: 60px 70px; box-sizing: border-box !important; position: relative; background: white; overflow: visible; font-size: 14px; line-height: 1.7; color: #000 !important; }
+    .page * { color: inherit; background-color: transparent; }
     .center { text-align: center; }
     .row { display: table; width: 100%; table-layout: fixed; }
     .row > * { display: table-cell; vertical-align: top; white-space: nowrap; }
@@ -964,18 +964,19 @@ router.get('/pdf/:id', async (req, res) => {
       '</head>',
       '<style>' +
         '@page{margin:0!important;size:A4 portrait;}' +
-        '*{max-width:none!important;box-sizing:border-box;}' +
         'html{margin:0!important;padding:0!important;}' +
-        'body{margin:0!important;padding:0!important;font-family:Arial,sans-serif;}' +
+        'body{margin:0!important;padding:0!important;font-family:Arial,sans-serif;' +
+        'color:#000!important;background:white;}' +
         '.page{width:210mm!important;min-height:297mm!important;height:auto!important;' +
         'overflow:visible!important;box-sizing:border-box!important;' +
         'padding:60px 70px!important;page-break-after:avoid!important;' +
-        'margin:0 auto!important;}' +
+        'margin:0 auto!important;color:#000!important;background:white!important;}' +
+        '.page *{color:inherit;background-color:transparent;}' +
         '.header{width:100%!important;}' +
         '.header img{width:100%!important;display:block;}' +
         'p{margin:6px 0!important;line-height:1.7!important;}' +
         'p:empty::before{content:"\\00a0";}' +
-        '*{page-break-inside:avoid!important;break-inside:avoid!important;}' +
+        'img{max-width:100%;}' +
         '.page-break{page-break-after:always!important;break-after:page!important;}' +
         '</style></head>'
     );
