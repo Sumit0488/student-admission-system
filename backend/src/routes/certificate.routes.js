@@ -507,9 +507,10 @@ function buildTemplateHtml(tmpl) {
   <meta charset="UTF-8" />
   <style>
     @page { margin: 0; size: A4 portrait; }
-    body { margin: 0 !important; padding: 0 !important; font-family: Arial, sans-serif; color: #000 !important; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    /* .page has NO padding — banner gets natural 100% width with no hacks */
-    .page { width: 210mm !important; min-height: 297mm; height: auto; margin: 0 auto !important; padding: 0 !important; box-sizing: border-box !important; position: relative; background: white; overflow: visible; color: #000 !important; }
+    html, body { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+    body { font-family: Arial, sans-serif; color: #000 !important; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    /* .page fills 100% of the PDF paper width — banner width:100% then equals full page edge-to-edge */
+    .page { width: 100% !important; min-height: 297mm; height: auto; margin: 0 !important; padding: 0 !important; box-sizing: border-box !important; position: relative; background: white; overflow: visible; color: #000 !important; }
     /* All padding lives in .page-body, keeping it separate from the banner */
     .page-body { padding: ${PAD_TOP}px ${PAD_SIDE}px; font-size: 14px; line-height: 1.7; }
     .page-body * { color: #000 !important; background-color: transparent !important; visibility: visible !important; opacity: 1 !important; }
@@ -994,12 +995,11 @@ router.get('/pdf/:id', async (req, res) => {
       '</head>',
       '<style>' +
         '@page{margin:0!important;size:A4 portrait;}' +
-        'html{margin:0!important;padding:0!important;}' +
-        'body{margin:0!important;padding:0!important;font-family:Arial,sans-serif;' +
-        'color:#000!important;background:white;}' +
-        '.page{width:210mm!important;min-height:297mm!important;height:auto!important;' +
+        'html,body{margin:0!important;padding:0!important;width:100%!important;}' +
+        'body{font-family:Arial,sans-serif;color:#000!important;background:white;}' +
+        '.page{width:100%!important;min-height:297mm!important;height:auto!important;' +
         'overflow:visible!important;box-sizing:border-box!important;' +
-        'padding:0!important;margin:0 auto!important;background:white!important;}' +
+        'padding:0!important;margin:0!important;background:white!important;}' +
         '.page-body{padding:60px 70px!important;font-size:14px;line-height:1.7;}' +
         '.page-body *{color:#000!important;background-color:transparent!important;' +
         'visibility:visible!important;opacity:1!important;}' +
