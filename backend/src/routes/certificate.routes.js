@@ -29,6 +29,7 @@ const Certificate = require('../models/certificate.model');
 const CertificateTemplate = require('../models/certificate-template.model');
 const Approval = require('../models/approval.model');
 const Student = require('../models/student.model');
+const AuditLog = require('../models/audit-log.model');
 const { getTenantFilter } = require('../utils/tenantFilter');
 
 // multer — memory storage (no temp files), 10 MB limit, PDF only
@@ -816,6 +817,17 @@ router.post('/issue', async (req, res) => {
       ...(req.tenantId && { tenantId: req.tenantId }),
     });
 
+    // Audit log — fire-and-forget
+    if (studentDoc?._id) {
+      AuditLog.create({
+        studentId: studentDoc._id,
+        actionType: 'CERTIFICATE_ISSUED',
+        performedBy: req.user?.email || req.headers['x-user'] || 'admin',
+        metadata: { certificateType: cert.type, certId: cert._id },
+        ...(req.tenantId && { tenantId: req.tenantId }),
+      }).catch(() => {});
+    }
+
     res.status(201).json({ success: true, data: cert });
   } catch (err) {
     console.error('ISSUE API ERROR:', err);
@@ -873,6 +885,25 @@ router.patch('/:id/approve', async (req, res) => {
     const filter = { certificateRef: cert._id, ...getTenantFilter(req.tenantId) };
     await Approval.findOneAndUpdate(filter, { status: 'Approved' });
 
+    // Audit log — resolve student from USN then log
+    Student.findOne({
+      $or: [{ student_id: cert.usn }, { email: cert.usn }],
+      isDeleted: { $ne: true },
+    })
+      .select('_id')
+      .lean()
+      .then((s) => {
+        if (!s) return;
+        return AuditLog.create({
+          studentId: s._id,
+          actionType: 'CERTIFICATE_APPROVED',
+          performedBy: req.user?.email || req.headers['x-user'] || 'admin',
+          metadata: { certificateType: cert.type, certId: cert._id },
+          ...(req.tenantId && { tenantId: req.tenantId }),
+        });
+      })
+      .catch(() => {});
+
     console.log(
       '[Puppeteer] Successfully updated certificate status to "Approved". (PDF will generate on download)'
     );
@@ -893,6 +924,26 @@ router.patch('/:id/reject', async (req, res) => {
     );
     const filter = { certificateRef: cert._id, ...getTenantFilter(req.tenantId) };
     await Approval.findOneAndUpdate(filter, { status: 'Rejected' });
+
+    // Audit log — fire-and-forget
+    Student.findOne({
+      $or: [{ student_id: cert.usn }, { email: cert.usn }],
+      isDeleted: { $ne: true },
+    })
+      .select('_id')
+      .lean()
+      .then((s) => {
+        if (!s) return;
+        return AuditLog.create({
+          studentId: s._id,
+          actionType: 'CERTIFICATE_REJECTED',
+          performedBy: req.user?.email || req.headers['x-user'] || 'admin',
+          metadata: { certificateType: cert.type, certId: cert._id },
+          ...(req.tenantId && { tenantId: req.tenantId }),
+        });
+      })
+      .catch(() => {});
+
     res.json({ success: true, data: cert });
   } catch (err) {
     console.error('REJECT API ERROR:', err);

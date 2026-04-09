@@ -11,6 +11,8 @@ import {
   exportStudents as apiExportStudents,
   exportFullReport as apiExportFullReport,
   getDistinctPrograms as apiGetDistinctPrograms,
+  bulkUpdateStudents as apiBulkUpdate,
+  bulkExportStudents as apiBulkExport,
 } from '../services/studentApi';
 import { getAllConfig } from '../services/configApi';
 import {
@@ -1074,6 +1076,9 @@ export default function StudentsPage() {
   const [exporting, setExporting] = useState(false);
   const [exportProgram, setExportProgram] = useState('');
   const [exportingReport, setExportingReport] = useState(false);
+  const [bulkStatusValue, setBulkStatusValue] = useState('');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [bulkExporting, setBulkExporting] = useState(false);
   const { toasts, toast, remove } = useToast();
 
   const debouncedSearch = useDebounce(search, 350);
@@ -1447,12 +1452,90 @@ export default function StudentsPage() {
             </div>
 
             <div className="flex items-center gap-2 ml-auto">
-              {/* Bulk actions — shown only when rows are selected */}
+              {/* ── Bulk action toolbar — shown only when rows are selected ── */}
               {selected.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-blue-600 dark:text-blue-400 font-medium bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-lg">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-lg">
                     {selected.length} selected
                   </span>
+
+                  {/* Change Status */}
+                  <div className="flex items-center rounded-lg border border-gray-200 dark:border-slate-600 overflow-hidden">
+                    <select
+                      value={bulkStatusValue}
+                      onChange={(e) => setBulkStatusValue(e.target.value)}
+                      disabled={bulkUpdating}
+                      className="text-xs text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-700 border-r border-gray-200 dark:border-slate-600 px-2 py-1.5 focus:outline-none disabled:opacity-50"
+                    >
+                      <option value="">Change Status…</option>
+                      {(config.statuses.length
+                        ? config.statuses
+                        : ['Live', 'Completed', 'Cancelled', 'Detained']
+                      ).map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={!bulkStatusValue || bulkUpdating}
+                      onClick={async () => {
+                        if (!bulkStatusValue) return;
+                        setBulkUpdating(true);
+                        try {
+                          const { data } = await apiBulkUpdate({
+                            studentIds: selected,
+                            action: 'status',
+                            value: bulkStatusValue,
+                          });
+                          toast(`${data.updated} student(s) updated to "${bulkStatusValue}"`);
+                          setSelected([]);
+                          setBulkStatusValue('');
+                          setPage(1);
+                          setRefreshKey((k) => k + 1);
+                          fetchCounts();
+                        } catch (err) {
+                          toast(err.response?.data?.error || 'Bulk update failed', 'error');
+                        } finally {
+                          setBulkUpdating(false);
+                        }
+                      }}
+                      className="text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {bulkUpdating ? 'Updating…' : 'Apply'}
+                    </button>
+                  </div>
+
+                  {/* Export Selected as CSV */}
+                  <button
+                    type="button"
+                    disabled={bulkExporting}
+                    onClick={async () => {
+                      setBulkExporting(true);
+                      try {
+                        const response = await apiBulkExport({ studentIds: selected });
+                        const url = URL.createObjectURL(
+                          new Blob([response.data], { type: 'text/csv' })
+                        );
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'selected_students.csv';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        toast(`Exported ${selected.length} student(s) to CSV`);
+                      } catch (err) {
+                        toast(err.response?.data?.error || 'Export failed', 'error');
+                      } finally {
+                        setBulkExporting(false);
+                      }
+                    }}
+                    className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
+                  >
+                    <Download size={13} /> {bulkExporting ? 'Exporting…' : 'Export CSV'}
+                  </button>
+
+                  {/* Delete selected */}
                   <button
                     type="button"
                     onClick={async () => {
@@ -1475,9 +1558,13 @@ export default function StudentsPage() {
                   >
                     <Trash2 size={13} /> Delete
                   </button>
+
                   <button
                     type="button"
-                    onClick={() => setSelected([])}
+                    onClick={() => {
+                      setSelected([]);
+                      setBulkStatusValue('');
+                    }}
                     className="text-xs text-gray-500 dark:text-slate-400 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
                   >
                     <X size={13} />

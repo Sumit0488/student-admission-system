@@ -5,7 +5,6 @@ import {
   FileText,
   CheckCircle,
   AlertCircle,
-  Clock,
   Award,
   Plus,
   MoreVertical,
@@ -13,6 +12,7 @@ import {
   Eye,
   XCircle,
   Activity,
+  ExternalLink,
 } from 'lucide-react';
 import {
   getCertificates,
@@ -21,7 +21,6 @@ import {
   approveCertificate,
   downloadCertificate,
   getAllCertificateRequests,
-  updateCertificateRequest,
 } from '../../services/admissionsApi';
 import qc from '../../services/queryCache';
 
@@ -148,7 +147,7 @@ function ActionMenu({ items }) {
   );
 }
 
-const TABS = ['Issued', 'Templates', 'Approvals', 'Timeline'];
+const TABS = ['Issued', 'Templates', 'Timeline'];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CertificatesPage() {
@@ -165,10 +164,8 @@ export default function CertificatesPage() {
   const [tmplLoad, setTmplLoad] = useState(() => !qc.has('templates'));
   const [dlId, setDlId] = useState(null);
 
-  // Certificate requests (student-submitted) — used by Approvals tab
+  // Certificate requests — fetched only for the pending count badge on the summary card
   const [certRequests, setCertRequests] = useState(() => qc.get('certRequests')?.data || []);
-  const [reqLoad, setReqLoad] = useState(() => !qc.has('certRequests'));
-  const [reqUpdating, setReqUpdating] = useState(null);
 
   const fetchCerts = useCallback(async () => {
     if (!qc.has('certificates')) setCertLoad(true);
@@ -195,14 +192,11 @@ export default function CertificatesPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchCertRequests = useCallback(async () => {
-    if (!qc.has('certRequests')) setReqLoad(true);
     try {
       const { data } = await getAllCertificateRequests();
       setCertRequests(data.data || []);
     } catch {
-      toast('Failed to load certificate requests', 'error');
-    } finally {
-      setReqLoad(false);
+      // Non-fatal — pending count badge will just show 0
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -244,32 +238,6 @@ export default function CertificatesPage() {
       toast(msg, 'error');
     } finally {
       setDlId(null);
-    }
-  };
-
-  const handleApproveRequest = async (id) => {
-    setReqUpdating(id);
-    try {
-      const { data } = await updateCertificateRequest(id, { status: 'Approved' });
-      setCertRequests((p) => p.map((r) => (r._id === id ? data.data : r)));
-      toast('Request approved');
-    } catch (err) {
-      toast(err?.response?.data?.error || 'Approval failed', 'error');
-    } finally {
-      setReqUpdating(null);
-    }
-  };
-
-  const handleRejectRequest = async (id) => {
-    setReqUpdating(id);
-    try {
-      const { data } = await updateCertificateRequest(id, { status: 'Rejected' });
-      setCertRequests((p) => p.map((r) => (r._id === id ? data.data : r)));
-      toast('Request rejected');
-    } catch {
-      toast('Rejection failed', 'error');
-    } finally {
-      setReqUpdating(null);
     }
   };
 
@@ -333,27 +301,53 @@ export default function CertificatesPage() {
         {/* ── Summary cards ───────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Total Issued', value: certs.length, color: 'blue' },
-            { label: 'Pending', value: pendingCerts.length, color: 'amber' },
+            { label: 'Total Issued', value: certs.length, color: 'blue', link: null },
+            {
+              label: 'Pending Approvals',
+              value: pendingCerts.length,
+              color: 'amber',
+              link: '/admin/admissions/approvals',
+            },
             {
               label: 'Generated',
               value: certs.filter((c) => c.status === 'Generated').length,
               color: 'green',
+              link: null,
             },
-            { label: 'Templates', value: templates.length, color: 'purple' },
-          ].map(({ label, value, color }) => (
-            <div
-              key={label}
-              className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 p-4 shadow-sm"
-            >
-              <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wide">
-                {label}
-              </p>
-              <p className={`text-2xl font-bold mt-1 text-${color}-600 dark:text-${color}-400`}>
-                {value}
-              </p>
-            </div>
-          ))}
+            { label: 'Templates', value: templates.length, color: 'purple', link: null },
+          ].map(({ label, value, color, link }) => {
+            const inner = (
+              <>
+                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wide">
+                  {label}
+                </p>
+                <p className={`text-2xl font-bold mt-1 text-${color}-600 dark:text-${color}-400`}>
+                  {value}
+                </p>
+                {link && (
+                  <p className="text-[10px] text-amber-500 font-medium mt-1 flex items-center gap-1">
+                    <ExternalLink size={10} /> View in Approvals
+                  </p>
+                )}
+              </>
+            );
+            return link ? (
+              <button
+                key={label}
+                onClick={() => navigate(link)}
+                className="bg-white dark:bg-slate-800 rounded-2xl border border-amber-200 dark:border-amber-700 p-4 shadow-sm text-left hover:border-amber-400 hover:shadow-md transition-all cursor-pointer"
+              >
+                {inner}
+              </button>
+            ) : (
+              <div
+                key={label}
+                className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 p-4 shadow-sm"
+              >
+                {inner}
+              </div>
+            );
+          })}
         </div>
 
         {/* ── Tabs ────────────────────────────────────────────────────────── */}
@@ -562,113 +556,6 @@ export default function CertificatesPage() {
                               },
                             ]}
                           />
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* ── APPROVALS TAB ───────────────────────────────────────────── */}
-          {activeTab === 'Approvals' && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[900px]">
-                <thead>
-                  <tr className="bg-gray-50 dark:bg-slate-900/50">
-                    {[
-                      'Student Name',
-                      'USN',
-                      'Certificate Type',
-                      'Reason',
-                      'Delivery',
-                      'Requested',
-                      'Status',
-                      'Actions',
-                    ].map((h) => (
-                      <th
-                        key={h}
-                        className="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
-                  {reqLoad ? (
-                    <SkeletonRows cols={8} />
-                  ) : certRequests.length === 0 ? (
-                    <EmptyRow cols={8} icon={CheckCircle} text="No certificate requests" />
-                  ) : (
-                    certRequests.map((r) => (
-                      <tr
-                        key={r._id}
-                        className="hover:bg-gray-50/60 dark:hover:bg-slate-700/30 transition-colors"
-                      >
-                        <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                          {r.studentName}
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs text-gray-500 dark:text-slate-400">
-                          {r.usn}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-slate-300">
-                          {r.certificateType}
-                        </td>
-                        <td
-                          className="px-4 py-3 text-gray-500 dark:text-slate-400 text-xs max-w-[140px] truncate"
-                          title={r.reason}
-                        >
-                          {r.reason || '—'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
-                            ${
-                              r.deliveryType === 'Hard Copy'
-                                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
-                                : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                            }`}
-                          >
-                            {r.deliveryType || 'Download'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
-                          {fmtDate(r.requestedDate || r.createdAt)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <StatusBadge status={r.status} />
-                          {r.remarks && (
-                            <p
-                              className="text-xs text-gray-400 mt-0.5 max-w-[100px] truncate"
-                              title={r.remarks}
-                            >
-                              {r.remarks}
-                            </p>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {r.status === 'Pending' ? (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleApproveRequest(r._id)}
-                                disabled={reqUpdating === r._id}
-                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50 transition-colors"
-                              >
-                                {reqUpdating === r._id ? '...' : 'Approve'}
-                              </button>
-                              <button
-                                onClick={() => handleRejectRequest(r._id)}
-                                disabled={reqUpdating === r._id}
-                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors"
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-400">—</span>
-                          )}
                         </td>
                       </tr>
                     ))

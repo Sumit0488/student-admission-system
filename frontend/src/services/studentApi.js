@@ -62,3 +62,14 @@ export const getStudentByUSN = async (usn) => {
   const exact = list.find((s) => (s.student_id || '').toUpperCase() === usn.toUpperCase());
   return exact || null;
 };
+
+// ── Bulk operations ───────────────────────────────────────────────────────────
+// POST /api/students/bulk-update  { studentIds, action, value }
+export const bulkUpdateStudents = (data) => api.post(`${API}/bulk-update`, data);
+
+// POST /api/students/bulk-export  { studentIds } → CSV blob
+export const bulkExportStudents = (data) =>
+  api.post(`${API}/bulk-export`, data, { responseType: 'blob' });
+
+// GET /api/students/:id/audit-logs
+export const getAuditLogs = (id) => api.get(`${API}/${id}/audit-logs`);

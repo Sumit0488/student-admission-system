@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   getStudentById as apiGetStudentById,
   updateStudent as apiUpdateStudent,
+  getAuditLogs as apiGetAuditLogs,
 } from '../services/studentApi';
 import { getAllConfig } from '../services/configApi';
 import {
@@ -171,7 +172,7 @@ function InfoCard({ label, value }) {
   );
 }
 
-const TABS = ['Summary', 'Certificates', 'Forms'];
+const TABS = ['Summary', 'Certificates', 'Activity', 'Forms'];
 
 // ─── Profile Page ─────────────────────────────────────────────────────────────
 export default function StudentProfilePage() {
@@ -203,6 +204,11 @@ export default function StudentProfilePage() {
   });
   const [certReqErrors, setCertReqErrors] = useState({});
   const [certReqSubmitting, setCertReqSubmitting] = useState(false);
+
+  // ── Activity / Audit log tab ───────────────────────────────────────────────
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditLoaded, setAuditLoaded] = useState(false);
   const [config, setConfig] = useState({
     programs: [
       'B.E CSE',
@@ -428,6 +434,19 @@ export default function StudentProfilePage() {
       setCertReqSubmitting(false);
     }
   };
+
+  // Fetch audit logs lazily when Activity tab is first opened
+  useEffect(() => {
+    if (activeTab !== 'Activity' || auditLoaded || !id) return;
+    setAuditLoading(true);
+    apiGetAuditLogs(id)
+      .then(({ data }) => {
+        setAuditLogs(data.data || []);
+        setAuditLoaded(true);
+      })
+      .catch(() => showToast('Failed to load activity log', 'error'))
+      .finally(() => setAuditLoading(false));
+  }, [activeTab, auditLoaded, id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
 
@@ -1270,6 +1289,98 @@ export default function StudentProfilePage() {
                       </div>
                     );
                   })()}
+              </div>
+            )}
+
+            {/* ── ACTIVITY TAB ── */}
+            {activeTab === 'Activity' && (
+              <div>
+                <h2 className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-5">
+                  Activity Timeline
+                </h2>
+
+                {auditLoading ? (
+                  <div className="space-y-5">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="flex gap-4">
+                        <div className="w-3 h-3 rounded-full bg-gray-200 dark:bg-slate-700 mt-1 animate-pulse flex-shrink-0" />
+                        <div className="flex-1 space-y-2">
+                          <div className="h-3 bg-gray-200 dark:bg-slate-700 rounded animate-pulse w-3/4" />
+                          <div className="h-2 bg-gray-100 dark:bg-slate-700/60 rounded animate-pulse w-1/3" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : auditLogs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-gray-400 dark:text-slate-500">
+                    <GraduationCap size={32} className="opacity-30 mb-2" />
+                    <p className="text-sm font-medium">No activity recorded yet</p>
+                    <p className="text-xs mt-1">
+                      Actions like status changes and certificate issuances appear here
+                    </p>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    {/* Vertical line */}
+                    <div className="absolute left-[5px] top-2 bottom-2 w-px bg-gray-200 dark:bg-slate-700" />
+                    <div className="space-y-5">
+                      {auditLogs.map((log) => {
+                        const DOT_COLOR = {
+                          CREATED: 'bg-blue-500',
+                          UPDATED: 'bg-gray-400',
+                          STATUS_CHANGED: 'bg-orange-500',
+                          CERTIFICATE_ISSUED: 'bg-purple-500',
+                          CERTIFICATE_APPROVED: 'bg-green-500',
+                          CERTIFICATE_REJECTED: 'bg-red-500',
+                        };
+                        const ACTION_LABEL = {
+                          CREATED: 'Student record created',
+                          UPDATED: 'Profile updated',
+                          STATUS_CHANGED: `Status changed → ${log.metadata?.newStatus || ''}`,
+                          CERTIFICATE_ISSUED: `Certificate issued — ${log.metadata?.certificateType || ''}`,
+                          CERTIFICATE_APPROVED: `Certificate approved — ${log.metadata?.certificateType || ''}`,
+                          CERTIFICATE_REJECTED: `Certificate rejected — ${log.metadata?.certificateType || ''}`,
+                        };
+                        const dotCls = DOT_COLOR[log.actionType] || 'bg-gray-400';
+                        const label = ACTION_LABEL[log.actionType] || log.actionType;
+                        const ts = new Date(log.createdAt);
+                        const dateStr = ts.toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        });
+                        const timeStr = ts.toLocaleTimeString('en-IN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        });
+
+                        return (
+                          <div key={log._id} className="flex gap-4 items-start">
+                            <div
+                              className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ring-2 ring-white dark:ring-slate-800 ${dotCls}`}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800 dark:text-slate-200 leading-snug">
+                                {label}
+                              </p>
+                              <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
+                                {dateStr} · {timeStr}
+                                {log.performedBy && log.performedBy !== 'admin' && (
+                                  <span className="ml-1">· by {log.performedBy}</span>
+                                )}
+                              </p>
+                              {log.actionType === 'UPDATED' && log.metadata?.fields?.length > 0 && (
+                                <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
+                                  Fields: {log.metadata.fields.join(', ')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const {
   createStudent,
@@ -15,6 +16,7 @@ const {
   changeStatus,
 } = require('../controllers/student');
 const Student = require('../models/student.model');
+const AuditLog = require('../models/audit-log.model');
 const Enquiry = require('../models/enquiry.model');
 const Schedule = require('../models/schedule.model');
 
@@ -102,6 +104,107 @@ router.post('/migrate/backfill-degree', async (req, res) => {
 
     const result = ops.length ? await Student.bulkWrite(ops) : { modifiedCount: 0 };
     res.json({ success: true, updated: result.modifiedCount, total: students.length });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── POST /api/students/bulk-update ──────────────────────────────────────────
+// Body: { studentIds: string[], action: "status", value: "Live" | ... }
+router.post('/bulk-update', async (req, res) => {
+  try {
+    const { studentIds, action, value } = req.body;
+
+    if (!Array.isArray(studentIds) || studentIds.length === 0)
+      return res
+        .status(400)
+        .json({ success: false, error: 'studentIds must be a non-empty array' });
+    if (action !== 'status')
+      return res.status(400).json({ success: false, error: 'action must be "status"' });
+    const VALID = ['Live', 'Completed', 'Cancelled', 'Detained'];
+    if (!VALID.includes(value))
+      return res
+        .status(400)
+        .json({ success: false, error: `value must be one of: ${VALID.join(', ')}` });
+
+    const validIds = studentIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+    if (validIds.length === 0)
+      return res.status(400).json({ success: false, error: 'No valid student IDs provided' });
+
+    const result = await Student.updateMany(
+      { _id: { $in: validIds }, isDeleted: { $ne: true } },
+      { $set: { admissionStatus: value } }
+    );
+
+    // Log audit entries for every updated student
+    const performedBy = req.user?.email || req.headers['x-user'] || 'admin';
+    const auditDocs = validIds.map((sid) => ({
+      studentId: sid,
+      actionType: 'STATUS_CHANGED',
+      performedBy,
+      metadata: { newStatus: value, bulk: true },
+      ...(req.tenantId && { tenantId: req.tenantId }),
+    }));
+    await AuditLog.insertMany(auditDocs);
+
+    res.json({ success: true, updated: result.modifiedCount });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── POST /api/students/bulk-export ──────────────────────────────────────────
+// Body: { studentIds: string[] }
+// Returns CSV text with headers: USN,Name,Email,Program,Batch,Status,Quota
+router.post('/bulk-export', async (req, res) => {
+  try {
+    const { studentIds } = req.body;
+    if (!Array.isArray(studentIds) || studentIds.length === 0)
+      return res
+        .status(400)
+        .json({ success: false, error: 'studentIds must be a non-empty array' });
+
+    const validIds = studentIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+    const students = await Student.find({ _id: { $in: validIds }, isDeleted: { $ne: true } })
+      .select('student_id fullName email program batch admissionStatus quota')
+      .lean();
+
+    if (students.length === 0)
+      return res.status(404).json({ success: false, error: 'No students found for provided IDs' });
+
+    // Build CSV
+    const escape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const header = ['USN', 'Full Name', 'Email', 'Program', 'Batch', 'Status', 'Quota'];
+    const rows = students.map((s) =>
+      [
+        escape(s.student_id),
+        escape(s.fullName),
+        escape(s.email),
+        escape(s.program),
+        escape(s.batch),
+        escape(s.admissionStatus),
+        escape(s.quota),
+      ].join(',')
+    );
+    const csv = [header.join(','), ...rows].join('\r\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="selected_students.csv"');
+    return res.send(csv);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── GET /api/students/:id/audit-logs ─────────────────────────────────────────
+router.get('/:id/audit-logs', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id))
+      return res.status(400).json({ success: false, error: 'Invalid student ID' });
+
+    const logs = await AuditLog.find({ studentId: id }).sort({ createdAt: -1 }).limit(100).lean();
+    return res.json({ success: true, data: logs });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

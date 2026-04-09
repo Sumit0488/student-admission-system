@@ -1,5 +1,6 @@
 const studentService = require('../../services/student.service');
-const handleError     = require('./handleError');
+const AuditLog = require('../../models/audit-log.model');
+const handleError = require('./handleError');
 
 // ─── UPDATE  PUT /api/students/:id ────────────────────────────────────────────
 const updateStudent = async (req, res) => {
@@ -11,6 +12,16 @@ const updateStudent = async (req, res) => {
     const data = await studentService.updateStudent(req.params.id, req.body);
     console.log('✅ Updated:', data.name);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+    // Audit log — fire-and-forget (non-fatal)
+    AuditLog.create({
+      studentId: req.params.id,
+      actionType: 'UPDATED',
+      performedBy: req.user?.email || req.headers['x-user'] || 'admin',
+      metadata: { fields: Object.keys(req.body) },
+      ...(req.tenantId && { tenantId: req.tenantId }),
+    }).catch(() => {});
+
     return res.json({ success: true, action: 'UPDATE', data });
   } catch (err) {
     return handleError(err, res, 'UPDATE');
@@ -26,6 +37,16 @@ const changeStatus = async (req, res) => {
     const data = await studentService.updateStudentStatus(req.params.id, req.body.status);
     console.log(`✅ Status changed: ${data.name} → ${data.status}`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+    // Audit log — fire-and-forget (non-fatal)
+    AuditLog.create({
+      studentId: req.params.id,
+      actionType: 'STATUS_CHANGED',
+      performedBy: req.user?.email || req.headers['x-user'] || 'admin',
+      metadata: { newStatus: req.body.status },
+      ...(req.tenantId && { tenantId: req.tenantId }),
+    }).catch(() => {});
+
     return res.json({ success: true, action: 'CHANGE_STATUS', data });
   } catch (err) {
     return handleError(err, res, 'CHANGE_STATUS');
