@@ -49,12 +49,11 @@ const tenantSchema = new mongoose.Schema(
 // Before saving, ensure `code` is always populated.
 // If code is absent, derive it from name.
 // Mirror the value into `slug` so legacy code that reads slug still works.
-tenantSchema.pre('save', function (next) {
+tenantSchema.pre('save', async function () {
   if (!this.code) {
     this.code = generateCode(this.name);
   }
   this.slug = this.code; // keep slug in sync
-  next();
 });
 
 tenantSchema.statics.generateCode = generateCode;
