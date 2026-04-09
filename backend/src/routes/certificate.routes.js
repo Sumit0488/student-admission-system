@@ -499,18 +499,21 @@ function buildTemplateHtml(tmpl) {
   <meta charset="UTF-8" />
   <style>
     @page { margin: 0; size: A4 portrait; }
-    body { margin:0; font-family:Arial,sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-    .page { width:794px; min-height:1123px; height:auto; margin:auto; padding:60px 70px; box-sizing:border-box; position:relative; background:white; overflow:visible; font-size:14px; line-height:1.7; }
-    .center { text-align:center; }
-    .row { display:table; width:100%; table-layout:fixed; }
-    .row > * { display:table-cell; vertical-align:top; white-space:nowrap; }
-    .row > *:last-child { text-align:right; }
-    .page-break { page-break-after:always; break-after:page; }
-    table { width:100%; border-collapse:collapse; margin:12px 0; }
-    th, td { border:1px solid #cbd5e1; padding:8px 12px; vertical-align:top; }
-    th { background:#f8fafc; font-weight:600; text-align:left; }
-    p { margin:6px 0; }
-    p:empty::before { content:'\\00a0'; }
+    * { max-width: none !important; box-sizing: border-box; }
+    body { margin: 0 !important; padding: 0 !important; font-family: Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { width: 210mm !important; min-height: 297mm; height: auto; margin: 0 auto !important; padding: 60px 70px; box-sizing: border-box !important; position: relative; background: white; overflow: visible; font-size: 14px; line-height: 1.7; }
+    .center { text-align: center; }
+    .row { display: table; width: 100%; table-layout: fixed; }
+    .row > * { display: table-cell; vertical-align: top; white-space: nowrap; }
+    .row > *:last-child { text-align: right; }
+    .page-break { page-break-after: always; break-after: page; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    th, td { border: 1px solid #cbd5e1; padding: 8px 12px; vertical-align: top; }
+    th { background: #f8fafc; font-weight: 600; text-align: left; }
+    p { margin: 6px 0; }
+    p:empty::before { content: '\\00a0'; }
+    .header { width: 100% !important; }
+    .header img { width: 100% !important; display: block; }
   </style>
 </head>
 <body>
@@ -961,15 +964,15 @@ router.get('/pdf/:id', async (req, res) => {
       '</head>',
       '<style>' +
         '@page{margin:0!important;size:A4 portrait;}' +
-        // Full-width html/body — DO NOT fix to 794px; let the A4 @page rule
-        // define the width so margin:auto on .page centres correctly.
-        'html{margin:0;padding:0;width:100%;}' +
-        'body{margin:0;padding:0;width:100%;display:flex;justify-content:center;' +
-        'font-family:Arial,sans-serif;}' +
-        '.page{width:794px!important;min-height:1123px!important;height:auto!important;' +
+        '*{max-width:none!important;box-sizing:border-box;}' +
+        'html{margin:0!important;padding:0!important;}' +
+        'body{margin:0!important;padding:0!important;font-family:Arial,sans-serif;}' +
+        '.page{width:210mm!important;min-height:297mm!important;height:auto!important;' +
         'overflow:visible!important;box-sizing:border-box!important;' +
         'padding:60px 70px!important;page-break-after:avoid!important;' +
         'margin:0 auto!important;}' +
+        '.header{width:100%!important;}' +
+        '.header img{width:100%!important;display:block;}' +
         'p{margin:6px 0!important;line-height:1.7!important;}' +
         'p:empty::before{content:"\\00a0";}' +
         '*{page-break-inside:avoid!important;break-inside:avoid!important;}' +
