@@ -457,13 +457,13 @@ function buildTemplateHtml(tmpl) {
   const bannerImgs = headerImgs.filter((img) => img.width >= BANNER_W);
   const logoImgs = headerImgs.filter((img) => img.width < BANNER_W);
 
-  // Banner sits directly in .page (which now has padding:0), so width:100%
-  // is the full 210mm page width — no negative-margin hacks needed.
+  // Banner uses 100vw (= 794px viewport we set explicitly) so it always spans
+  // the full PDF paper width regardless of CSS inheritance chain in Chromium.
   const bannerHtml = bannerImgs
     .map(
       (img) =>
-        `<div style="width:100%;line-height:0;overflow:hidden;display:block;">` +
-        `<img src="${img.src}" style="width:100%;display:block;" /></div>`
+        `<div style="width:100vw;margin-left:0;line-height:0;overflow:hidden;display:block;">` +
+        `<img src="${img.src}" style="width:100vw;height:auto;display:block;" /></div>`
     )
     .join('');
 
@@ -507,10 +507,10 @@ function buildTemplateHtml(tmpl) {
   <meta charset="UTF-8" />
   <style>
     @page { margin: 0; size: A4 portrait; }
-    html, body { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+    html, body { margin: 0 !important; padding: 0 !important; width: 100vw !important; }
     body { font-family: Arial, sans-serif; color: #000 !important; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    /* .page fills 100% of the PDF paper width — banner width:100% then equals full page edge-to-edge */
-    .page { width: 100% !important; min-height: 297mm; height: auto; margin: 0 !important; padding: 0 !important; box-sizing: border-box !important; position: relative; background: white; overflow: visible; color: #000 !important; }
+    /* .page uses 100vw (= explicit 794px viewport) so it's always the full paper width */
+    .page { width: 100vw !important; min-height: 297mm; height: auto; margin: 0 !important; padding: 0 !important; box-sizing: border-box !important; position: relative; background: white; overflow: visible; color: #000 !important; }
     /* All padding lives in .page-body, keeping it separate from the banner */
     .page-body { padding: ${PAD_TOP}px ${PAD_SIDE}px; font-size: 14px; line-height: 1.7; }
     .page-body * { color: #000 !important; background-color: transparent !important; visibility: visible !important; opacity: 1 !important; }
@@ -995,9 +995,9 @@ router.get('/pdf/:id', async (req, res) => {
       '</head>',
       '<style>' +
         '@page{margin:0!important;size:A4 portrait;}' +
-        'html,body{margin:0!important;padding:0!important;width:100%!important;}' +
+        'html,body{margin:0!important;padding:0!important;width:100vw!important;}' +
         'body{font-family:Arial,sans-serif;color:#000!important;background:white;}' +
-        '.page{width:100%!important;min-height:297mm!important;height:auto!important;' +
+        '.page{width:100vw!important;min-height:297mm!important;height:auto!important;' +
         'overflow:visible!important;box-sizing:border-box!important;' +
         'padding:0!important;margin:0!important;background:white!important;}' +
         '.page-body{padding:60px 70px!important;font-size:14px;line-height:1.7;}' +
