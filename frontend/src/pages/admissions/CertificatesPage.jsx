@@ -5,6 +5,7 @@ import {
   FileText,
   CheckCircle,
   AlertCircle,
+  Clock,
   Award,
   Plus,
   MoreVertical,
