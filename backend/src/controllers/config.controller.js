@@ -1,27 +1,32 @@
 const Config = require('../models/config.model');
+const MasterData = require('../models/master-data.model');
 
 const VALID_TYPES = ['program', 'batch', 'status'];
 
 // ─── GET /api/config ──────────────────────────────────────────────────────────
-// Returns all three config types in one request (reduces frontend round-trips)
+// Returns all config types in one request (reduces frontend round-trips)
 const getAllConfigs = async (_req, res) => {
   try {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('CONFIG API HIT  →  GET /api/config');
 
-    const [programs, batches, statuses] = await Promise.all([
+    const [programs, batches, statuses, quotaRows] = await Promise.all([
       Config.find({ type: 'program' }).sort({ order: 1, value: 1 }),
-      Config.find({ type: 'batch'   }).sort({ order: 1, value: 1 }),
-      Config.find({ type: 'status'  }).sort({ order: 1, value: 1 }),
+      Config.find({ type: 'batch' }).sort({ order: 1, value: 1 }),
+      Config.find({ type: 'status' }).sort({ order: 1, value: 1 }),
+      MasterData.find({ type: 'quota', isActive: true }).sort({ order: 1, label: 1 }),
     ]);
 
     const data = {
       programs: programs.map((i) => i.value),
-      batches:  batches.map((i)  => i.value),
+      batches: batches.map((i) => i.value),
       statuses: statuses.map((i) => i.value),
+      quotas: quotaRows.map((i) => i.label),
     };
 
-    console.log(`✅ Config loaded — programs:${data.programs.length} batches:${data.batches.length} statuses:${data.statuses.length}`);
+    console.log(
+      `✅ Config loaded — programs:${data.programs.length} batches:${data.batches.length} statuses:${data.statuses.length} quotas:${data.quotas.length}`
+    );
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     res.json({ success: true, data });

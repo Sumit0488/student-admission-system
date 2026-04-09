@@ -304,6 +304,7 @@ const EMPTY = {
   program: '',
   batch: '',
   status: 'Live',
+  quota: '',
   phone: '',
   personalEmail: '',
   address: '',
@@ -316,6 +317,7 @@ function AddStudentModal({
   programs = [],
   batches = [],
   statuses = [],
+  quotas = [],
   configLoading = false,
 }) {
   const [form, setForm] = useState(EMPTY);
@@ -332,6 +334,7 @@ function AddStudentModal({
     if (!form.name.trim()) e.name = 'Full name is required';
     if (!form.program.trim()) e.program = 'Program is required';
     if (!form.batch.trim()) e.batch = 'Batch is required';
+    if (!form.quota.trim()) e.quota = 'Quota is required';
     if (form.phone && !/^\+91\d{10}$/.test(form.phone)) e.phone = 'Format: +91XXXXXXXXXX';
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -455,6 +458,22 @@ function AddStudentModal({
                 )}
               </select>
             </div>
+          </div>
+
+          {/* Quota */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">
+              Quota <span className="text-red-500">*</span>
+            </label>
+            <select value={form.quota} onChange={set('quota')} className={inputCls(errors.quota)}>
+              <option value="">{configLoading ? '⏳ Loading...' : '— Select Quota —'}</option>
+              {quotas.map((q) => (
+                <option key={q} value={q}>
+                  {q}
+                </option>
+              ))}
+            </select>
+            {errors.quota && <p className="text-xs text-red-500 mt-1">{errors.quota}</p>}
           </div>
 
           {/* Phone */}
@@ -606,6 +625,7 @@ function EditStudentModal({
   programs = [],
   batches = [],
   statuses = [],
+  quotas = [],
   configLoading = false,
 }) {
   const [form, setForm] = useState({
@@ -613,6 +633,7 @@ function EditStudentModal({
     program: student.program || '',
     batch: student.batch || '',
     status: student.status || 'Live',
+    quota: student.quota || '',
     phone: student.phone || '',
     email: student.email || '',
     address: student.address || '',
@@ -713,6 +734,7 @@ function EditStudentModal({
           {field('Program', 'program', '', 'text', programs)}
           {field('Batch', 'batch', '', 'text', batches)}
           {field('Status', 'status', '', 'text', statuses)}
+          {field('Quota *', 'quota', '', 'text', quotas.length ? quotas : undefined)}
           <PhoneInput
             value={form.phone || ''}
             onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
@@ -1041,6 +1063,7 @@ export default function StudentsPage() {
       '2026–2030',
     ],
     statuses: ['Live', 'Completed', 'Cancelled', 'Detained'],
+    quotas: ['Management', 'CET', 'COMEDK', 'NRI', 'Government', 'Minority', 'SNQ'],
   });
   const [configLoading, setConfigLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -1152,7 +1175,7 @@ export default function StudentsPage() {
         console.log('[Config] programs:', data.data?.programs);
         console.log('[Config] batches :', data.data?.batches);
         console.log('[Config] statuses:', data.data?.statuses);
-        if (data.data?.programs?.length) setConfig(data.data);
+        if (data.data?.programs?.length) setConfig((prev) => ({ ...prev, ...data.data }));
       })
       .catch((err) => {
         console.error('[Config] ❌ Failed to fetch /api/config:', err.message);
@@ -1319,6 +1342,7 @@ export default function StudentsPage() {
           programs={config.programs}
           batches={config.batches}
           statuses={config.statuses}
+          quotas={config.quotas}
           configLoading={configLoading}
         />
       )}
@@ -1331,6 +1355,7 @@ export default function StudentsPage() {
           programs={config.programs}
           batches={config.batches}
           statuses={config.statuses}
+          quotas={config.quotas}
           configLoading={configLoading}
         />
       )}
@@ -1780,14 +1805,16 @@ export default function StudentsPage() {
                       className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     />
                   </th>
-                  {['USN', 'Full Name', 'Status', 'Sem', 'Program', 'Batch', ''].map((h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide"
-                    >
-                      {h}
-                    </th>
-                  ))}
+                  {['USN', 'Full Name', 'Status', 'Sem', 'Program', 'Batch', 'Quota', ''].map(
+                    (h) => (
+                      <th
+                        key={h}
+                        className="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide"
+                      >
+                        {h}
+                      </th>
+                    )
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
@@ -1795,7 +1822,7 @@ export default function StudentsPage() {
                   Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
                 ) : paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-16 text-center">
+                    <td colSpan={9} className="px-6 py-16 text-center">
                       <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-slate-500">
                         <Search size={32} className="opacity-30" />
                         <p className="font-medium text-sm">
@@ -1861,6 +1888,15 @@ export default function StudentsPage() {
                       </td>
                       <td className="px-4 py-3.5 text-gray-500 dark:text-slate-400 whitespace-nowrap">
                         {s.batch}
+                      </td>
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        {s.quota ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400">
+                            {s.quota}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-red-400 italic">Not set</span>
+                        )}
                       </td>
                       <td className="px-4 py-3.5 relative">
                         {/* ✅ FIX: ⋮ button is now always visible, not hidden behind opacity-0 */}

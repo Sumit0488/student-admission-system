@@ -19,6 +19,8 @@ const validateCreateInput = (body) => {
 
   if (!body.program || !body.program.trim()) throw new AppError('Program is required', 400);
 
+  if (!body.quota || !body.quota.trim()) throw new AppError('Quota is required', 400);
+
   const phoneError = validatePhone(body.phone);
   if (phoneError) throw new AppError(phoneError, 400);
 };

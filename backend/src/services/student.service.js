@@ -82,6 +82,7 @@ const createStudent = async (body, tenantId = null) => {
   const personalEmail = (body.personalEmail || '').trim().toLowerCase();
   const address = (body.address || '').trim();
   const city = (body.city || '').trim();
+  const quota = (body.quota || '').trim();
   const term = body.term !== null && body.term !== undefined ? Number(body.term) : null;
   const admissionCategory = (body.admissionCategory || '').trim();
 
@@ -112,6 +113,7 @@ const createStudent = async (body, tenantId = null) => {
     city,
     program,
     batch,
+    quota,
     term,
     admissionCategory,
     admissionStatus: status || 'Live',
