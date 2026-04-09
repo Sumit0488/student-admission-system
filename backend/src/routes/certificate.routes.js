@@ -904,13 +904,23 @@ router.get('/pdf/:id', async (req, res) => {
       });
     }
 
-    let tmpl = cert.templateId;
+    let tmpl = cert.templateId; // populated object or null
     if (!tmpl && cert.type) {
-      // Try to find template by name (handles underscore vs space mismatch)
-      const normalizedType = cert.type.replace(/_/g, ' ');
+      // Normalise: underscores → spaces, trim
+      const normalizedType = cert.type.replace(/_/g, ' ').trim();
+      // 1st try: exact name match (case-insensitive)
       tmpl = await CertificateTemplate.findOne({
-        name: { $regex: new RegExp(`^${normalizedType}$`, 'i') },
+        name: {
+          $regex: new RegExp(`^${normalizedType.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+        },
       });
+      // 2nd try: template name *contains* the cert type keyword (handles "bonafide" → "Bonafide Certificate")
+      if (!tmpl) {
+        const keyword = normalizedType.split(/\s+/)[0]; // first word
+        tmpl = await CertificateTemplate.findOne({
+          name: { $regex: new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
+        });
+      }
     }
     if (!tmpl) {
       return res.status(400).json({
