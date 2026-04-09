@@ -15,6 +15,12 @@ const STATUS_ICON = {
   Approved: <CheckCircle size={12} />,
   Rejected: <XCircle size={12} />,
 };
+// Normalize DB status to canonical casing (DB has mix of "pending" / "Pending")
+const normalizeStatus = (s) => {
+  if (!s) return 'Pending';
+  const cap = s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  return ['Pending', 'Approved', 'Rejected'].includes(cap) ? cap : s;
+};
 
 function useToast() {
   const [toasts, setToasts] = useState([]);
@@ -241,80 +247,83 @@ function StudentRequestsTab({ toast }) {
                   </td>
                 </tr>
               ) : (
-                requests.map((r) => (
-                  <tr
-                    key={r._id}
-                    className="hover:bg-gray-50/60 dark:hover:bg-slate-700/30 transition-colors"
-                  >
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                      {r.studentName}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-500 dark:text-slate-400">
-                      {r.usn}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-slate-300">
-                      {r.certificateType}
-                    </td>
-                    <td
-                      className="px-4 py-3 text-gray-500 dark:text-slate-400 text-xs max-w-[160px] truncate"
-                      title={r.reason}
+                requests.map((r) => {
+                  const status = normalizeStatus(r.status);
+                  return (
+                    <tr
+                      key={r._id}
+                      className="hover:bg-gray-50/60 dark:hover:bg-slate-700/30 transition-colors"
                     >
-                      {r.reason || '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
+                        {r.studentName}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-500 dark:text-slate-400">
+                        {r.usn}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-slate-300">
+                        {r.certificateType}
+                      </td>
+                      <td
+                        className="px-4 py-3 text-gray-500 dark:text-slate-400 text-xs max-w-[160px] truncate"
+                        title={r.reason}
+                      >
+                        {r.reason || '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
                       ${
                         r.deliveryType === 'Hard Copy'
                           ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
                           : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
                       }`}
-                      >
-                        {r.deliveryType || 'Download'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-400 dark:text-slate-500 text-xs whitespace-nowrap">
-                      {new Date(r.requestedDate || r.createdAt).toLocaleDateString('en-IN')}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_STYLE[r.status]}`}
-                      >
-                        {STATUS_ICON[r.status]} {r.status}
-                      </span>
-                      {r.remarks && (
-                        <p
-                          className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 max-w-[120px] truncate"
-                          title={r.remarks}
                         >
-                          {r.remarks}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {r.status === 'Pending' && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleApprove(r._id)}
-                            disabled={updating === r._id}
-                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+                          {r.deliveryType || 'Download'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-400 dark:text-slate-500 text-xs whitespace-nowrap">
+                        {new Date(r.requestedDate || r.createdAt).toLocaleDateString('en-IN')}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_STYLE[status]}`}
+                        >
+                          {STATUS_ICON[status]} {status}
+                        </span>
+                        {r.remarks && (
+                          <p
+                            className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 max-w-[120px] truncate"
+                            title={r.remarks}
                           >
-                            <CheckCircle size={12} />
-                            {updating === r._id ? '...' : 'Approve'}
-                          </button>
-                          <button
-                            onClick={() => setRejectTarget(r._id)}
-                            disabled={updating === r._id}
-                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-50 transition-colors"
-                          >
-                            <XCircle size={12} />
-                            Reject
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                            {r.remarks}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {status === 'Pending' && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleApprove(r._id)}
+                              disabled={updating === r._id}
+                              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+                            >
+                              <CheckCircle size={12} />
+                              {updating === r._id ? '...' : 'Approve'}
+                            </button>
+                            <button
+                              onClick={() => setRejectTarget(r._id)}
+                              disabled={updating === r._id}
+                              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-50 transition-colors"
+                            >
+                              <XCircle size={12} />
+                              Reject
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
