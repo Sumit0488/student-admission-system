@@ -373,8 +373,9 @@ export default function TemplateEditorPage() {
     const bannerHtml = bannerImgs
       .map(
         (img) =>
-          `<div style="margin:-${PAD_TOP}px -${PAD_SIDE}px 12px -${PAD_SIDE}px;line-height:0;">` +
-          `<img src="${img.src}" style="width:100%;display:block;" /></div>`
+          `<div style="margin:-${PAD_TOP}px -${PAD_SIDE}px 12px -${PAD_SIDE}px;` +
+          `width:calc(100% + ${PAD_SIDE * 2}px);line-height:0;overflow:hidden;">` +
+          `<img src="${img.src}" style="width:100%;max-width:none;display:block;" /></div>`
       )
       .join('');
 
