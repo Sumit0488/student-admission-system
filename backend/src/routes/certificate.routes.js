@@ -501,7 +501,8 @@ function buildTemplateHtml(tmpl) {
     @page { margin: 0; size: A4 portrait; }
     body { margin: 0 !important; padding: 0 !important; font-family: Arial, sans-serif; color: #000 !important; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .page { width: 210mm !important; min-height: 297mm; height: auto; margin: 0 auto !important; padding: 60px 70px; box-sizing: border-box !important; position: relative; background: white; overflow: visible; font-size: 14px; line-height: 1.7; color: #000 !important; }
-    .page * { color: inherit; background-color: transparent; }
+    .page * { color: #000 !important; background-color: transparent !important; }
+    .page img { background-color: initial !important; }
     .center { text-align: center; }
     .row { display: table; width: 100%; table-layout: fixed; }
     .row > * { display: table-cell; vertical-align: top; white-space: nowrap; }
@@ -939,8 +940,23 @@ router.get('/pdf/:id', async (req, res) => {
     });
 
     const vars = buildAutoVars(student, cert.studentName, cert.usn);
+
+    // Warn if template has no body text — helps diagnose blank PDFs
+    const rawNotes = (tmpl.notes || '').trim();
+    if (!rawNotes) {
+      console.warn('[PDF] Template "%s" has empty notes — PDF body will be blank', tmpl.name);
+    }
+
+    // Strip dark-mode inline colors that would render invisible on white PDF background.
+    // This normalises pasted content that carries dark-theme background/foreground styles.
+    const cleanNotes = (tmpl.notes || '').replace(
+      /\bbackground(?:-color)?\s*:[^;}"']+/gi,
+      'background-color:transparent'
+    );
+    const tmplForPdf = { ...(tmpl.toObject ? tmpl.toObject() : tmpl), notes: cleanNotes };
+
     // Always rebuild HTML from notes + images — fullHtml is no longer stored in DB.
-    const htmlContent = buildTemplateHtml(tmpl);
+    const htmlContent = buildTemplateHtml(tmplForPdf);
     const finalHTML = substituteVars(htmlContent, vars);
 
     // 🔥 Generate PDF using Puppeteer on-the-fly
@@ -971,7 +987,8 @@ router.get('/pdf/:id', async (req, res) => {
         'overflow:visible!important;box-sizing:border-box!important;' +
         'padding:60px 70px!important;page-break-after:avoid!important;' +
         'margin:0 auto!important;color:#000!important;background:white!important;}' +
-        '.page *{color:inherit;background-color:transparent;}' +
+        '.page *{color:#000!important;background-color:transparent!important;}' +
+        '.page img{background-color:initial!important;}' +
         '.header{width:100%!important;}' +
         '.header img{width:100%!important;display:block;}' +
         'p{margin:6px 0!important;line-height:1.7!important;}' +
