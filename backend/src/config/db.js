@@ -11,6 +11,10 @@ dns.setDefaultResultOrder('ipv4first');
 // Use well-known public resolvers that are reachable over IPv4.
 dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
 
+// Increase Mongoose's buffer timeout so queries don't fail before the
+// Atlas connection is established (default 10 s is too short for cold starts)
+mongoose.set('bufferTimeoutMS', 30000);
+
 // ─── Connection cache ─────────────────────────────────────────────────────────
 let connectionPromise = null;
 
