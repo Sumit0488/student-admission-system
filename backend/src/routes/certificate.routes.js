@@ -458,12 +458,13 @@ function buildTemplateHtml(tmpl) {
   const bannerImgs = headerImgs.filter((img) => img.width >= BANNER_W);
   const logoImgs = headerImgs.filter((img) => img.width < BANNER_W);
 
-  // Banner: explicit 794px (A4 at 96dpi) — avoids vw ambiguity in print media
+  // Banner: width:100% fills .page (794px, padding:0) exactly.
+  // Using percentage avoids any sub-pixel rounding vs. explicit pixel values.
   const bannerHtml = bannerImgs
     .map(
       (img) =>
-        `<div style="width:794px;margin-left:0;line-height:0;overflow:hidden;display:block;">` +
-        `<img src="${img.src}" style="width:794px;height:auto;display:block;" /></div>`
+        `<div style="width:100%;line-height:0;overflow:hidden;display:block;">` +
+        `<img src="${img.src}" style="width:100%;height:auto;display:block;" /></div>`
     )
     .join('');
 
@@ -507,12 +508,11 @@ function buildTemplateHtml(tmpl) {
   <meta charset="UTF-8" />
   <style>
     @page { margin: 0; size: A4 portrait; }
-    /* Use explicit 794px (= A4 at 96dpi) — never vw/vmin which behave
-       differently between screen and print media in Chromium */
-    html { margin: 0 !important; padding: 0 !important; width: 794px !important; }
-    body { margin: 0 !important; padding: 0 !important; width: 794px !important;
+    html { margin: 0 !important; padding: 0 !important; }
+    body { margin: 0 !important; padding: 0 !important;
            font-family: Arial, sans-serif; color: #000 !important; background: white;
            -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    /* .page is the single fixed-width container — everything is sized relative to it */
     .page { width: 794px !important; min-height: 297mm; height: auto;
             margin: 0 !important; padding: 0 !important; box-sizing: border-box !important;
             position: relative; background: white; overflow: visible; color: #000 !important; }
@@ -1055,66 +1055,27 @@ router.get('/pdf/:id', async (req, res) => {
     browser = await puppeteer.launch(options);
     const page = await browser.newPage();
 
-    // Set viewport to exactly match the A4 page pixel dimensions used in the
-    // template editor (794 × 1123 @ 96 DPI).  Without this, Puppeteer uses its
-    // default 800 × 600 viewport, which can cause subtle scaling differences
-    // that shift absolute-positioned images relative to the text content.
+    // Set viewport to exactly A4 pixel dimensions at 96 DPI (794 × 1123).
+    // Content is loaded in screen mode so the viewport width controls layout —
+    // this avoids print-media quirks where @page dimensions override setViewport.
     await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1 });
-    // Switch to print media BEFORE setContent so @page{margin:0} is honoured
-    // and the banner's negative-margin bleed reaches the physical page edge.
+
+    await page.setContent(finalHTML, { waitUntil: 'networkidle0' });
+
+    // Switch to print media AFTER the content has loaded at the correct 794 px
+    // screen width. This ensures print-color-adjust and @page rules are active
+    // for the PDF render without altering the already-established layout.
     await page.emulateMediaType('print');
 
-    // Inject CSS that matches the editor exactly — same line-height and margins
-    // so the preview and PDF render identically.
-    const fixedHTML = finalHTML.replace(
-      '</head>',
-      '<style>' +
-        '@page{margin:0!important;size:A4 portrait;}' +
-        'html{margin:0!important;padding:0!important;width:794px!important;}' +
-        'body{margin:0!important;padding:0!important;width:794px!important;' +
-        'font-family:Arial,sans-serif;color:#000!important;background:white;}' +
-        '.page{width:794px!important;min-height:297mm!important;height:auto!important;' +
-        'overflow:visible!important;box-sizing:border-box!important;' +
-        'padding:0!important;margin:0!important;background:white!important;}' +
-        '.page-body{padding:60px 70px!important;font-size:14px;line-height:1.7;' +
-        'width:100%!important;box-sizing:border-box!important;}' +
-        '.page-body *{color:#000!important;background-color:transparent!important;' +
-        'visibility:visible!important;opacity:1!important;}' +
-        '.page-body img{background-color:initial!important;}' +
-        '.page-body p,.page-body div,.page-body span,.page-body h1,.page-body h2,' +
-        '.page-body h3,.page-body h4,.page-body li,.page-body td,.page-body th,' +
-        '.page-body font{display:revert;visibility:visible!important;opacity:1!important;}' +
-        'p{margin:6px 0!important;line-height:1.7!important;}' +
-        'p:empty::before{content:"\\00a0";}' +
-        '.page-break{page-break-after:always!important;break-after:page!important;}' +
-        '</style></head>'
-    );
-    await page.setContent(fixedHTML, { waitUntil: 'networkidle0' });
-
-    // Measure the actual rendered height of .page and compute a scale factor
-    // so the content always fits within a single A4 page (1123 px at 96 DPI).
-    const A4_PX = 1123;
-    const contentHeight = await page.evaluate(() => {
-      const el = document.querySelector('.page');
-      return el ? el.scrollHeight : document.body.scrollHeight;
-    });
-    const scale = contentHeight > A4_PX ? parseFloat((A4_PX / contentHeight).toFixed(4)) : 1;
-    console.log(`[PDF] content height: ${contentHeight}px  →  scale: ${scale}`);
-
-    // Scale by applying zoom to <html> — this shrinks the ENTIRE rendered page
-    // uniformly, so the full 794px width remains aligned to the left paper edge
-    // with no blank strip on the right (which happened when only .page was zoomed).
-    if (scale < 1) {
-      await page.evaluate((s) => {
-        document.documentElement.style.zoom = String(s);
-      }, scale);
-    }
-
+    // page.pdf with explicit pixel dimensions guarantees a perfect 1:1 mapping:
+    // the HTML layout (794 px) == the PDF page width (794 px), so there is no
+    // DPI-conversion rounding that could leave a blank strip on the right.
+    // Margins are set to 0 both here and via @page{margin:0} in the HTML CSS.
     const pdfRaw = await page.pdf({
-      format: 'A4',
+      width: '794px',
+      height: '1123px',
       printBackground: true,
-      scale: 1, // always 1 — scaling is handled via CSS zoom above
-      margin: { top: '0', bottom: '0', left: '0', right: '0' },
+      margin: { top: '0mm', bottom: '0mm', left: '0mm', right: '0mm' },
     });
     const pdfBuffer = Buffer.isBuffer(pdfRaw) ? pdfRaw : Buffer.from(pdfRaw);
 
