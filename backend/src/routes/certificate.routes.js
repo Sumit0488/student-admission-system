@@ -776,13 +776,24 @@ router.post('/issue', async (req, res) => {
     // Build auto-variable map from student data
     const autoVars = buildAutoVars(studentDoc, studentName.trim(), usn.trim());
 
-    // Caller-supplied fieldValues override autoVars, but only when non-empty
-    // (empty strings from the UI form must not overwrite backend-computed values)
+    // Caller-supplied fieldValues override autoVars (non-empty values only)
     const overrides = {};
     for (const [k, v] of Object.entries(fieldValues || {})) {
       if (v !== '' && v !== null && v !== undefined) overrides[k] = v;
     }
     const valMap = { ...autoVars, ...overrides };
+
+    // Validate required fields — reject if any required field is missing in the final map
+    const missingRequired = (tmpl.fields || [])
+      .filter((f) => f.required && (valMap[f.key] === '' || valMap[f.key] == null))
+      .map((f) => f.name || f.key);
+    if (missingRequired.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Missing required fields: ${missingRequired.join(', ')}`,
+        missingFields: missingRequired,
+      });
+    }
     let filledNotes = substituteVars(tmpl.notes || '', valMap);
 
     // Inject floating images (if any) as absolutely-positioned elements
@@ -1005,7 +1016,15 @@ router.get('/pdf/:id', async (req, res) => {
       isDeleted: { $ne: true },
     });
 
-    const vars = buildAutoVars(student, cert.studentName, cert.usn);
+    const autoVars = buildAutoVars(student, cert.studentName, cert.usn);
+
+    // Merge stored fieldValues on top of auto-vars so manually-entered values
+    // (e.g. boolean, class, date_of_pass_of_month_and_year) always appear in the PDF.
+    const storedFieldValues =
+      cert.fieldValues instanceof Map
+        ? Object.fromEntries(cert.fieldValues)
+        : cert.fieldValues || {};
+    const vars = { ...autoVars, ...storedFieldValues };
 
     // Warn if template has no body text — helps diagnose blank PDFs
     const rawNotes = (tmpl.notes || '').trim();

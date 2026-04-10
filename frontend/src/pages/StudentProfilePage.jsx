@@ -1222,44 +1222,67 @@ export default function StudentProfilePage() {
                               </select>
                             </div>
 
-                            {/* Only show fields that are NOT in the student profile */}
-                            {tmpl?.fields?.length > 0 &&
-                              (() => {
-                                const manualFields = tmpl.fields.filter(
-                                  (f) => !(f.key in studentAutoFill)
-                                );
-                                return manualFields.length > 0 ? (
-                                  <div className="space-y-3">
-                                    {manualFields.map((f) => (
-                                      <div key={f.key}>
-                                        <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
-                                          {f.name}
-                                          {f.required && (
-                                            <span className="text-red-500 ml-0.5">*</span>
-                                          )}
-                                        </label>
-                                        <input
-                                          type={
-                                            f.type === 'date'
-                                              ? 'date'
-                                              : f.type === 'number'
-                                                ? 'number'
-                                                : 'text'
-                                          }
-                                          value={fieldValues[f.key] || ''}
-                                          onChange={(e) =>
-                                            setFieldValues((p) => ({
-                                              ...p,
-                                              [f.key]: e.target.value,
-                                            }))
-                                          }
-                                          className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                      </div>
-                                    ))}
+                            {/* Show all template fields — auto-filled ones are pre-populated, others are blank */}
+                            {tmpl?.fields?.length > 0 && (
+                              <div className="space-y-3">
+                                {tmpl.fields.map((f) => (
+                                  <div key={f.key}>
+                                    <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
+                                      {f.name}
+                                      {f.required && <span className="text-red-500 ml-0.5">*</span>}
+                                    </label>
+                                    {f.type === 'boolean' ? (
+                                      <select
+                                        value={fieldValues[f.key] ?? ''}
+                                        onChange={(e) =>
+                                          setFieldValues((p) => ({ ...p, [f.key]: e.target.value }))
+                                        }
+                                        className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      >
+                                        <option value="">— Select —</option>
+                                        <option value="Yes">Yes</option>
+                                        <option value="No">No</option>
+                                      </select>
+                                    ) : f.type === 'dropdown' && f.options?.length > 0 ? (
+                                      <select
+                                        value={fieldValues[f.key] ?? ''}
+                                        onChange={(e) =>
+                                          setFieldValues((p) => ({ ...p, [f.key]: e.target.value }))
+                                        }
+                                        className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      >
+                                        <option value="">— Select —</option>
+                                        {f.options.map((opt) => (
+                                          <option key={opt} value={opt}>
+                                            {opt}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      <input
+                                        type={
+                                          f.type === 'date'
+                                            ? 'date'
+                                            : f.type === 'number'
+                                              ? 'number'
+                                              : 'text'
+                                        }
+                                        value={fieldValues[f.key] ?? ''}
+                                        onChange={(e) =>
+                                          setFieldValues((p) => ({ ...p, [f.key]: e.target.value }))
+                                        }
+                                        placeholder={
+                                          f.key in studentAutoFill
+                                            ? 'Auto-filled from student profile'
+                                            : ''
+                                        }
+                                        className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      />
+                                    )}
                                   </div>
-                                ) : null;
-                              })()}
+                                ))}
+                              </div>
+                            )}
 
                             {selTemplate && !tmpl?.fields?.length && (
                               <p className="text-xs text-gray-400 dark:text-slate-500 bg-gray-50 dark:bg-slate-700/50 rounded-xl p-3">
