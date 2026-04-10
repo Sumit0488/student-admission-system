@@ -458,13 +458,12 @@ function buildTemplateHtml(tmpl) {
   const bannerImgs = headerImgs.filter((img) => img.width >= BANNER_W);
   const logoImgs = headerImgs.filter((img) => img.width < BANNER_W);
 
-  // Banner uses 100vw (= 794px viewport we set explicitly) so it always spans
-  // the full PDF paper width regardless of CSS inheritance chain in Chromium.
+  // Banner: explicit 794px (A4 at 96dpi) — avoids vw ambiguity in print media
   const bannerHtml = bannerImgs
     .map(
       (img) =>
-        `<div style="width:100vw;margin-left:0;line-height:0;overflow:hidden;display:block;">` +
-        `<img src="${img.src}" style="width:100vw;height:auto;display:block;" /></div>`
+        `<div style="width:794px;margin-left:0;line-height:0;overflow:hidden;display:block;">` +
+        `<img src="${img.src}" style="width:794px;height:auto;display:block;" /></div>`
     )
     .join('');
 
@@ -508,13 +507,19 @@ function buildTemplateHtml(tmpl) {
   <meta charset="UTF-8" />
   <style>
     @page { margin: 0; size: A4 portrait; }
-    html, body { margin: 0 !important; padding: 0 !important; width: 100vw !important; }
-    body { font-family: Arial, sans-serif; color: #000 !important; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    /* .page uses 100vw (= explicit 794px viewport) so it's always the full paper width */
-    .page { width: 100vw !important; min-height: 297mm; height: auto; margin: 0 !important; padding: 0 !important; box-sizing: border-box !important; position: relative; background: white; overflow: visible; color: #000 !important; }
-    /* All padding lives in .page-body, keeping it separate from the banner */
-    .page-body { padding: ${PAD_TOP}px ${PAD_SIDE}px; font-size: 14px; line-height: 1.7; }
-    .page-body * { color: #000 !important; background-color: transparent !important; visibility: visible !important; opacity: 1 !important; }
+    /* Use explicit 794px (= A4 at 96dpi) — never vw/vmin which behave
+       differently between screen and print media in Chromium */
+    html { margin: 0 !important; padding: 0 !important; width: 794px !important; }
+    body { margin: 0 !important; padding: 0 !important; width: 794px !important;
+           font-family: Arial, sans-serif; color: #000 !important; background: white;
+           -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { width: 794px !important; min-height: 297mm; height: auto;
+            margin: 0 !important; padding: 0 !important; box-sizing: border-box !important;
+            position: relative; background: white; overflow: visible; color: #000 !important; }
+    .page-body { padding: ${PAD_TOP}px ${PAD_SIDE}px; font-size: 14px; line-height: 1.7;
+                 width: 100%; box-sizing: border-box; }
+    .page-body * { color: #000 !important; background-color: transparent !important;
+                   visibility: visible !important; opacity: 1 !important; }
     .page-body img { background-color: initial !important; }
     .page-body p, .page-body div, .page-body span,
     .page-body h1, .page-body h2, .page-body h3, .page-body h4,
@@ -1065,12 +1070,14 @@ router.get('/pdf/:id', async (req, res) => {
       '</head>',
       '<style>' +
         '@page{margin:0!important;size:A4 portrait;}' +
-        'html,body{margin:0!important;padding:0!important;width:100vw!important;}' +
-        'body{font-family:Arial,sans-serif;color:#000!important;background:white;}' +
-        '.page{width:100vw!important;min-height:297mm!important;height:auto!important;' +
+        'html{margin:0!important;padding:0!important;width:794px!important;}' +
+        'body{margin:0!important;padding:0!important;width:794px!important;' +
+        'font-family:Arial,sans-serif;color:#000!important;background:white;}' +
+        '.page{width:794px!important;min-height:297mm!important;height:auto!important;' +
         'overflow:visible!important;box-sizing:border-box!important;' +
         'padding:0!important;margin:0!important;background:white!important;}' +
-        '.page-body{padding:60px 70px!important;font-size:14px;line-height:1.7;}' +
+        '.page-body{padding:60px 70px!important;font-size:14px;line-height:1.7;' +
+        'width:100%!important;box-sizing:border-box!important;}' +
         '.page-body *{color:#000!important;background-color:transparent!important;' +
         'visibility:visible!important;opacity:1!important;}' +
         '.page-body img{background-color:initial!important;}' +
@@ -1094,14 +1101,12 @@ router.get('/pdf/:id', async (req, res) => {
     const scale = contentHeight > A4_PX ? parseFloat((A4_PX / contentHeight).toFixed(4)) : 1;
     console.log(`[PDF] content height: ${contentHeight}px  →  scale: ${scale}`);
 
-    // Apply scaling via CSS zoom instead of page.pdf({scale}).
-    // page.pdf({scale < 1}) anchors from the top-left, leaving blank space on
-    // the right equal to (1 - scale) × pageWidth.  CSS zoom shrinks the element
-    // while the flex body keeps it horizontally centred.
+    // Scale by applying zoom to <html> — this shrinks the ENTIRE rendered page
+    // uniformly, so the full 794px width remains aligned to the left paper edge
+    // with no blank strip on the right (which happened when only .page was zoomed).
     if (scale < 1) {
       await page.evaluate((s) => {
-        const el = document.querySelector('.page');
-        if (el) el.style.zoom = String(s);
+        document.documentElement.style.zoom = String(s);
       }, scale);
     }
 
