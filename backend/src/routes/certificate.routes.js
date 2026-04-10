@@ -458,13 +458,15 @@ function buildTemplateHtml(tmpl) {
   const bannerImgs = headerImgs.filter((img) => img.width >= BANNER_W);
   const logoImgs = headerImgs.filter((img) => img.width < BANNER_W);
 
-  // Banner: width:100% fills .page (794px, padding:0) exactly.
-  // Using percentage avoids any sub-pixel rounding vs. explicit pixel values.
+  // Banner: width:100% of .page (794px, padding:0).
+  // Use the stored height (from the editor) so the PDF matches the editor preview exactly —
+  // height:auto would use the natural image aspect ratio which can be taller than the
+  // editor shows, causing content to overflow onto a second page.
   const bannerHtml = bannerImgs
     .map(
       (img) =>
-        `<div style="width:100%;line-height:0;overflow:hidden;display:block;">` +
-        `<img src="${img.src}" style="width:100%;height:auto;display:block;" /></div>`
+        `<div style="width:100%;height:${img.height}px;line-height:0;overflow:hidden;display:block;">` +
+        `<img src="${img.src}" style="width:100%;height:${img.height}px;object-fit:fill;display:block;" /></div>`
     )
     .join('');
 
