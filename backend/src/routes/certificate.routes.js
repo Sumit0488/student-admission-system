@@ -458,15 +458,12 @@ function buildTemplateHtml(tmpl) {
   const bannerImgs = headerImgs.filter((img) => img.width >= BANNER_W);
   const logoImgs = headerImgs.filter((img) => img.width < BANNER_W);
 
-  // Banner: width:100% of .page (794px, padding:0).
-  // Use the stored height (from the editor) so the PDF matches the editor preview exactly —
-  // height:auto would use the natural image aspect ratio which can be taller than the
-  // editor shows, causing content to overflow onto a second page.
+  // Banner: width:100% of .page (794px, padding:0), natural aspect-ratio height.
   const bannerHtml = bannerImgs
     .map(
       (img) =>
-        `<div style="width:100%;height:${img.height}px;line-height:0;overflow:hidden;display:block;">` +
-        `<img src="${img.src}" style="width:100%;height:${img.height}px;object-fit:fill;display:block;" /></div>`
+        `<div style="width:100%;line-height:0;overflow:hidden;display:block;">` +
+        `<img src="${img.src}" style="width:100%;height:auto;display:block;" /></div>`
     )
     .join('');
 
@@ -1057,25 +1054,34 @@ router.get('/pdf/:id', async (req, res) => {
     browser = await puppeteer.launch(options);
     const page = await browser.newPage();
 
-    // Set viewport to exactly A4 pixel dimensions at 96 DPI (794 × 1123).
-    // Content is loaded in screen mode so the viewport width controls layout —
-    // this avoids print-media quirks where @page dimensions override setViewport.
-    await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1 });
+    // 794 px viewport width matches the template editor exactly.
+    // Use a tall initial height so content doesn't get clipped before measurement.
+    await page.setViewport({ width: 794, height: 4000, deviceScaleFactor: 1 });
 
     await page.setContent(finalHTML, { waitUntil: 'networkidle0' });
 
-    // Switch to print media AFTER the content has loaded at the correct 794 px
-    // screen width. This ensures print-color-adjust and @page rules are active
-    // for the PDF render without altering the already-established layout.
+    // Measure the true rendered height of the page BEFORE switching to print mode.
+    // This gives the actual content height at screen layout (794 px wide).
+    const contentHeight = await page.evaluate(() => {
+      const el = document.querySelector('.page');
+      return el ? el.scrollHeight : document.body.scrollHeight;
+    });
+
+    // PDF page height = content height (minimum A4 = 1123 px).
+    // This keeps ALL content on a SINGLE page without scaling and without
+    // leaving blank space on the right (which happens when zoom shrinks the
+    // 794 px content into a narrower area of a fixed-width page).
+    const pdfHeight = Math.max(Math.ceil(contentHeight), 1123);
+    console.log(`[PDF] content height: ${contentHeight}px → PDF height: ${pdfHeight}px`);
+
+    // Switch to print media for correct colour rendering in the final PDF.
     await page.emulateMediaType('print');
 
-    // page.pdf with explicit pixel dimensions guarantees a perfect 1:1 mapping:
-    // the HTML layout (794 px) == the PDF page width (794 px), so there is no
-    // DPI-conversion rounding that could leave a blank strip on the right.
-    // Margins are set to 0 both here and via @page{margin:0} in the HTML CSS.
+    // width:'794px' guarantees the PDF page width == HTML layout width (794 px)
+    // with no DPI-conversion rounding that could leave a blank strip on the right.
     const pdfRaw = await page.pdf({
       width: '794px',
-      height: '1123px',
+      height: `${pdfHeight}px`,
       printBackground: true,
       margin: { top: '0mm', bottom: '0mm', left: '0mm', right: '0mm' },
     });
