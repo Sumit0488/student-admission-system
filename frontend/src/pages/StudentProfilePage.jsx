@@ -322,11 +322,29 @@ export default function StudentProfilePage() {
         place: student.city || '',
         status: student.status || '',
         admission_status: student.status || '',
-        // Fields backend can fill but frontend doesn't have — still mark as known
-        // so they don't appear as manual inputs (backend fills from student record)
-        father_name: '',
-        date_of_birth: '',
-        dob: '',
+        // Personal details — shown pre-filled so user can verify before issuing
+        father_name: student.fatherName || '',
+        fatherName: student.fatherName || '',
+        gender: student.gender || '',
+        religion: student.religion || '',
+        caste: student.caste || '',
+        date_of_birth: student.dob ? new Date(student.dob).toLocaleDateString('en-GB') : '',
+        dob: student.dob ? new Date(student.dob).toLocaleDateString('en-GB') : '',
+        date_of_birth_in_words: '', // backend computes from dob
+        date_of_admission: student.admissionDate
+          ? new Date(student.admissionDate).toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })
+          : '',
+        date_of_leaving_the_institute: student.lastJoiningDate
+          ? new Date(student.lastJoiningDate).toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })
+          : '',
         current_date: '', // backend generates today's date
       }
     : {};

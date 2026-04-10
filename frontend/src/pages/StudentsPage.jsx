@@ -310,6 +310,13 @@ const EMPTY = {
   phone: '',
   personalEmail: '',
   address: '',
+  fatherName: '',
+  gender: '',
+  dob: '',
+  religion: '',
+  caste: '',
+  admissionDate: '',
+  lastJoiningDate: '',
 };
 
 function AddStudentModal({
@@ -530,6 +537,97 @@ function AddStudentModal({
             />
           </div>
 
+          {/* Father Name */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">
+              Father&apos;s Name
+            </label>
+            <input
+              value={form.fatherName}
+              onChange={set('fatherName')}
+              placeholder="e.g. Rajesh Sharma"
+              className={inputCls(false)}
+            />
+          </div>
+
+          {/* DOB + Gender */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">
+                Date of Birth
+              </label>
+              <input
+                type="date"
+                value={form.dob}
+                onChange={set('dob')}
+                className={inputCls(false)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">
+                Gender
+              </label>
+              <select value={form.gender} onChange={set('gender')} className={inputCls(false)}>
+                <option value="">— Select —</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Religion + Caste */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">
+                Religion
+              </label>
+              <input
+                value={form.religion}
+                onChange={set('religion')}
+                placeholder="e.g. Hindu"
+                className={inputCls(false)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">
+                Caste / Category
+              </label>
+              <input
+                value={form.caste}
+                onChange={set('caste')}
+                placeholder="e.g. OBC"
+                className={inputCls(false)}
+              />
+            </div>
+          </div>
+
+          {/* Admission Date + Leaving Date */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">
+                Date of Admission
+              </label>
+              <input
+                type="date"
+                value={form.admissionDate}
+                onChange={set('admissionDate')}
+                className={inputCls(false)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">
+                Date of Leaving
+              </label>
+              <input
+                type="date"
+                value={form.lastJoiningDate}
+                onChange={set('lastJoiningDate')}
+                className={inputCls(false)}
+              />
+            </div>
+          </div>
+
           {/* Actions */}
           <div className="flex gap-3 pt-2">
             <button
@@ -639,6 +737,13 @@ function EditStudentModal({
     phone: student.phone || '',
     email: student.email || '',
     address: student.address || '',
+    fatherName: student.fatherName || '',
+    gender: student.gender || '',
+    dob: student.dob ? student.dob.slice(0, 10) : '',
+    religion: student.religion || '',
+    caste: student.caste || '',
+    admissionDate: student.admissionDate ? student.admissionDate.slice(0, 10) : '',
+    lastJoiningDate: student.lastJoiningDate ? student.lastJoiningDate.slice(0, 10) : '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -743,6 +848,34 @@ function EditStudentModal({
           />
           {field('Email', 'email', 'e.g. student@email.com', 'email')}
           {field('Address', 'address', 'e.g. 123 Main St, City')}
+          {field("Father's Name", 'fatherName', 'e.g. Rajesh Sharma')}
+          <div className="grid grid-cols-2 gap-3">
+            {field('Date of Birth', 'dob', '', 'date')}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">
+                Gender
+              </label>
+              <select
+                name="gender"
+                value={form.gender}
+                onChange={handleChange}
+                className="w-full px-3 py-2.5 text-sm rounded-lg border border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">— Select —</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {field('Religion', 'religion', 'e.g. Hindu')}
+            {field('Caste / Category', 'caste', 'e.g. OBC')}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {field('Date of Admission', 'admissionDate', '', 'date')}
+            {field('Date of Leaving', 'lastJoiningDate', '', 'date')}
+          </div>
 
           <div className="flex gap-3 pt-2">
             <button

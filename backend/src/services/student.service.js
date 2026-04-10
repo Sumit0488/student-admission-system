@@ -65,6 +65,14 @@ const format = (s) => ({
   examPassed: s.examPassed ?? true,
   noDues: s.noDues ?? true,
   createdAt: s.createdAt,
+  // Personal details — needed by PDF generation and Edit modal
+  fatherName: s.fatherName || '',
+  gender: s.gender || '',
+  dob: s.dob ? s.dob.toISOString() : null,
+  religion: s.religion || '',
+  caste: s.caste || '',
+  admissionDate: s.admissionDate ? s.admissionDate.toISOString() : null,
+  lastJoiningDate: s.lastJoiningDate ? s.lastJoiningDate.toISOString() : null,
 });
 
 // ─── Tenant filter helper — includes legacy records (no tenantId) ────────────
@@ -117,6 +125,16 @@ const createStudent = async (body, tenantId = null) => {
     term,
     admissionCategory,
     admissionStatus: status || 'Live',
+    // Personal details needed for PDF generation
+    ...(body.fatherName !== undefined && { fatherName: (body.fatherName || '').trim() }),
+    ...(body.gender !== undefined && { gender: (body.gender || '').trim() }),
+    ...(body.religion !== undefined && { religion: (body.religion || '').trim() }),
+    ...(body.caste !== undefined && { caste: (body.caste || '').trim() }),
+    ...(body.dob !== undefined && body.dob && { dob: new Date(body.dob) }),
+    ...(body.admissionDate !== undefined &&
+      body.admissionDate && { admissionDate: new Date(body.admissionDate) }),
+    ...(body.lastJoiningDate !== undefined &&
+      body.lastJoiningDate && { lastJoiningDate: new Date(body.lastJoiningDate) }),
     ...(tenantId && { tenantId }),
   });
 
@@ -254,6 +272,18 @@ const updateStudent = async (id, body) => {
       }),
       ...(body.examPassed !== undefined && { examPassed: Boolean(body.examPassed) }),
       ...(body.noDues !== undefined && { noDues: Boolean(body.noDues) }),
+      // Personal details needed for PDF generation
+      ...(body.fatherName !== undefined && { fatherName: (body.fatherName || '').trim() }),
+      ...(body.gender !== undefined && { gender: (body.gender || '').trim() }),
+      ...(body.religion !== undefined && { religion: (body.religion || '').trim() }),
+      ...(body.caste !== undefined && { caste: (body.caste || '').trim() }),
+      ...(body.dob !== undefined && { dob: body.dob ? new Date(body.dob) : null }),
+      ...(body.admissionDate !== undefined && {
+        admissionDate: body.admissionDate ? new Date(body.admissionDate) : null,
+      }),
+      ...(body.lastJoiningDate !== undefined && {
+        lastJoiningDate: body.lastJoiningDate ? new Date(body.lastJoiningDate) : null,
+      }),
     },
     { new: true, runValidators: true }
   );
