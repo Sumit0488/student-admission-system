@@ -29,8 +29,10 @@ const Certificate = require('../models/certificate.model');
 const CertificateTemplate = require('../models/certificate-template.model');
 const Approval = require('../models/approval.model');
 const Student = require('../models/student.model');
+const Tenant = require('../models/tenant.model');
 const AuditLog = require('../models/audit-log.model');
 const { getTenantFilter } = require('../utils/tenantFilter');
+const CertificateApprovalService = require('../services/certificateApproval.service');
 
 // multer — memory storage (no temp files), 10 MB limit, PDF only
 const pdfUpload = multer({
@@ -209,7 +211,11 @@ function formatDateFullWords(dateString) {
 }
 
 // Build a variable map from a Student document for template auto-fill
-function buildAutoVars(student, fallbackName, fallbackUsn) {
+// tenantInfo = { place: string, name: string } from the Tenant document
+function buildAutoVars(student, fallbackName, fallbackUsn, tenantInfo) {
+  const ti = typeof tenantInfo === 'string' ? { place: tenantInfo } : tenantInfo || {};
+  const DEFAULT_PLACE = ti.place || 'Davanagere';
+  const COLLEGE_NAME = ti.name || '';
   const today = new Date();
   const currentDate = today.toLocaleDateString('en-GB', {
     day: 'numeric',
@@ -231,7 +237,8 @@ function buildAutoVars(student, fallbackName, fallbackUsn) {
       batch: ay,
       current_date: currentDate,
       date: currentDate,
-      place: 'Davanagere',
+      place: DEFAULT_PLACE,
+      college_name: COLLEGE_NAME,
     };
   }
 
@@ -283,7 +290,7 @@ function buildAutoVars(student, fallbackName, fallbackUsn) {
     email: student.email || '',
     phone: student.phone || '',
     address: student.address || '',
-    place: student.city || 'Davanagere',
+    place: student.city || DEFAULT_PLACE,
 
     // ── Academic ───────────────────────────────────────────────────────────
     program: programCode, // short code: "CSE", "ECE" …
@@ -332,6 +339,9 @@ function buildAutoVars(student, fallbackName, fallbackUsn) {
           year: 'numeric',
         })
       : '',
+
+    // ── Institution ──────────────────────────────────────────────────────
+    college_name: COLLEGE_NAME,
   };
 
   console.log(
@@ -380,31 +390,11 @@ async function checkEligibility(usn, certificateType) {
   });
   if (!student) return []; // unknown USN — don't block (may be manually issued)
 
-  const errors = [];
-  if (student.admissionStatus !== 'Live') {
-    errors.push(
-      `Student status is "${student.admissionStatus}" — only Live students can receive certificates`
-    );
-  }
-  if (student.isDebarred) {
-    errors.push('Student is debarred — certificates cannot be issued');
-  }
-  if (!student.feesCleared) {
-    errors.push('Fees not cleared — please settle outstanding dues first');
-  }
-  if (student.attendanceCleared === false) {
-    errors.push('Attendance not cleared — minimum attendance requirement not met');
-  }
-  if (student.examPassed === false) {
-    errors.push('Exam not passed — all examinations must be cleared');
-  }
-  if (student.noDues === false) {
-    errors.push('Dues pending — all dues must be cleared before issuing certificates');
-  }
-  if (certificateType === 'Transfer Certificate' && !student.feesCleared) {
-    errors.push('Transfer Certificate requires all fees to be cleared');
-  }
-  return errors;
+  const CertificateApprovalService = require('../services/certificateApproval.service');
+  const evaluation = CertificateApprovalService.evaluateCertificate(certificateType, student);
+
+  if (evaluation.isValid) return [];
+  return evaluation.errors;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -444,8 +434,12 @@ function syncFieldsFromNotes(notes, suppliedFields) {
 // Mirrors the frontend buildFullHtml() so PDF output matches the editor preview.
 // Called at PDF-generation time — fullHtml is never stored in MongoDB.
 function buildTemplateHtml(tmpl) {
-  const notes = tmpl.notes || '';
-  const images = tmpl.images || [];
+  const GARBAGE_RE = /xscsbcjzbjcbjkCJKJCnjcnncjxjkcnjkncj/gi;
+  const notes = (tmpl.notes || '').replace(GARBAGE_RE, '');
+  const images = (tmpl.images || []).map((img) => ({
+    ...img,
+    src: typeof img.src === 'string' ? img.src.replace(GARBAGE_RE, '') : img.src,
+  }));
 
   const PAGE_W = 794;
   const BANNER_W = Math.round(PAGE_W * 0.7); // 556 px — same threshold as frontend
@@ -506,12 +500,13 @@ function buildTemplateHtml(tmpl) {
 <head>
   <meta charset="UTF-8" />
   <style>
-    @page { margin: 0; size: A4 portrait; }
+    /* NO size: in @page — let page.pdf() width/height control the page dimensions */
+    @page { margin: 0; }
     html { margin: 0 !important; padding: 0 !important; }
     body { margin: 0 !important; padding: 0 !important;
            font-family: Arial, sans-serif; color: #000 !important; background: white;
            -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    /* .page is the single fixed-width container — everything is sized relative to it */
+    /* overflow:visible so content is never clipped — PDF height adapts to content */
     .page { width: 794px !important; min-height: 297mm; height: auto;
             margin: 0 !important; padding: 0 !important; box-sizing: border-box !important;
             position: relative; background: white; overflow: visible; color: #000 !important; }
@@ -729,6 +724,9 @@ router.get('/', async (req, res) => {
       usn: c.usn || 'N/A',
       type: c.type || c.templateId?.name || 'Certificate',
       status: c.status || 'Pending',
+      validationStatus: c.validationStatus || 'PENDING',
+      validationErrors: c.validationErrors || [],
+      isOverridden: c.isOverridden || false,
       pdfBase64: c.pdfBase64 || null,
       generatedDate: c.generatedDate || null,
       requestedDate: c.requestedDate || null,
@@ -777,8 +775,15 @@ router.post('/issue', async (req, res) => {
       isDeleted: { $ne: true },
     });
 
+    // Resolve tenant info for {{place}} and {{college_name}} variables
+    let tenantInfo = {};
+    if (req.tenantId) {
+      const tenant = await Tenant.findById(req.tenantId).select('collegeAddress name').lean();
+      tenantInfo = { place: tenant?.collegeAddress?.city || '', name: tenant?.name || '' };
+    }
+
     // Build auto-variable map from student data
-    const autoVars = buildAutoVars(studentDoc, studentName.trim(), usn.trim());
+    const autoVars = buildAutoVars(studentDoc, studentName.trim(), usn.trim(), tenantInfo);
 
     // Caller-supplied fieldValues override autoVars (non-empty values only)
     const overrides = {};
@@ -812,6 +817,16 @@ router.post('/issue', async (req, res) => {
       filledNotes = `<div style="position:relative;">${imgsHtml}${filledNotes}</div>`;
     }
 
+    const CertificateApprovalService = require('../services/certificateApproval.service');
+    const config = CertificateApprovalService.getCertificateConfig(tmpl.name);
+
+    let initialStatus = 'Pending';
+    let initialValidationStatus = 'PENDING';
+    if (config.requiresValidation === false) {
+      initialStatus = 'Generated';
+      initialValidationStatus = 'PENDING';
+    }
+
     const cert = await Certificate.create({
       studentName: studentName.trim(),
       usn: usn.trim(),
@@ -819,6 +834,9 @@ router.post('/issue', async (req, res) => {
       templateId,
       filledNotes,
       fieldValues: valMap,
+      requiresValidation: config.requiresValidation !== false,
+      status: initialStatus,
+      validationStatus: initialValidationStatus,
       ...(req.tenantId && { tenantId: req.tenantId }),
     });
 
@@ -867,10 +885,23 @@ router.post('/create', async (req, res) => {
         .json({ success: false, error: 'Student is not eligible', eligibilityErrors: eligErrors });
     }
 
+    const CertificateApprovalService = require('../services/certificateApproval.service');
+    const config = CertificateApprovalService.getCertificateConfig(type);
+
+    let initialStatus = 'Pending';
+    let initialValidationStatus = 'PENDING';
+    if (config.requiresValidation === false) {
+      initialStatus = 'Generated';
+      initialValidationStatus = 'PENDING';
+    }
+
     const cert = await Certificate.create({
       studentName: studentName.trim(),
       usn: usn.trim(),
       type,
+      requiresValidation: config.requiresValidation !== false,
+      status: initialStatus,
+      validationStatus: initialValidationStatus,
     });
 
     await Approval.create({
@@ -890,10 +921,54 @@ router.post('/create', async (req, res) => {
 // PATCH /api/certificates/:id/approve
 router.patch('/:id/approve', async (req, res) => {
   try {
+    const { override, overrideReason } = req.body || {};
+
     let cert = await Certificate.findById(req.params.id);
     if (!cert) return res.status(404).json({ success: false, error: 'Certificate not found' });
 
-    cert.status = 'Approved';
+    if (cert.status === 'Approved' || cert.status === 'Generated') {
+      return res.status(400).json({ success: false, error: 'Certificate is already approved' });
+    }
+
+    const studentDoc = await Student.findOne({
+      $or: [{ student_id: cert.usn }, { email: cert.usn }],
+      isDeleted: { $ne: true },
+    });
+
+    if (override) {
+      if (!overrideReason) {
+        return res.status(400).json({ success: false, error: 'Override reason is required' });
+      }
+      cert.status = 'Approved';
+      cert.validationStatus = 'MANUAL_APPROVED';
+      cert.isOverridden = true;
+      cert.overrideReason = overrideReason;
+    } else {
+      const evaluation = CertificateApprovalService.evaluateCertificate(cert.type, studentDoc);
+
+      if (!evaluation.isValid) {
+        cert.status = 'Rejected';
+        cert.validationStatus = 'AUTO_REJECTED';
+        cert.validationErrors = evaluation.errors;
+        await cert.save();
+
+        await Approval.findOneAndUpdate(
+          { certificateRef: cert._id, ...(req.tenantId && { tenantId: req.tenantId }) },
+          { status: 'Rejected' }
+        );
+
+        return res.status(400).json({
+          success: false,
+          error: 'Certificate automatically rejected due to failed validation rules',
+          validationErrors: evaluation.errors,
+        });
+      }
+
+      cert.status = 'Approved';
+      cert.validationStatus = 'AUTO_APPROVED';
+      cert.validationErrors = [];
+    }
+
     cert = await cert.save();
 
     // Update the associated approval document
@@ -970,43 +1045,30 @@ router.patch('/:id/reject', async (req, res) => {
 //  PDF GENERATION (Puppeteer — renders actual HTML/CSS)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// GET /api/certificates/pdf/:id
-router.get('/pdf/:id', async (req, res) => {
+// ─── PDF Generation Helper ────────────────────────────────────────────────────
+/**
+ * Shared logic to generate a PDF for a certificate.
+ * Assumes validation has already been performed by the caller.
+ */
+async function performPdfGeneration(cert, req, res) {
   let browser;
   try {
-    console.log('PDF API HIT', req.params.id);
-
-    const cert = await Certificate.findById(req.params.id).populate('templateId');
-    if (!cert) return res.status(404).json({ success: false, error: 'Certificate not found' });
-
-    if (cert.status !== 'Approved' && cert.status !== 'Generated') {
-      return res.status(403).json({
-        success: false,
-        error:
-          cert.status === 'Rejected'
-            ? 'This certificate has been rejected and cannot be downloaded.'
-            : 'Certificate is pending approval. Download is available once approved.',
-      });
-    }
-
     let tmpl = cert.templateId; // populated object or null
     if (!tmpl && cert.type) {
-      // Normalise: underscores → spaces, trim
       const normalizedType = cert.type.replace(/_/g, ' ').trim();
-      // 1st try: exact name match (case-insensitive)
       tmpl = await CertificateTemplate.findOne({
         name: {
           $regex: new RegExp(`^${normalizedType.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
         },
       });
-      // 2nd try: template name *contains* the cert type keyword (handles "bonafide" → "Bonafide Certificate")
       if (!tmpl) {
-        const keyword = normalizedType.split(/\s+/)[0]; // first word
+        const keyword = normalizedType.split(/\s+/)[0];
         tmpl = await CertificateTemplate.findOne({
           name: { $regex: new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
         });
       }
     }
+
     if (!tmpl) {
       return res.status(400).json({
         success: false,
@@ -1014,107 +1076,203 @@ router.get('/pdf/:id', async (req, res) => {
       });
     }
 
-    // 🔥 Get student data to fill variables live
     const student = await Student.findOne({
       $or: [{ student_id: cert.usn }, { email: cert.usn }],
       isDeleted: { $ne: true },
     });
 
-    const autoVars = buildAutoVars(student, cert.studentName, cert.usn);
+    // Resolve tenant info for place/college_name
+    let tenantInfo = {};
+    if (cert.tenantId) {
+      const tenant = await Tenant.findById(cert.tenantId).select('collegeAddress name').lean();
+      tenantInfo = { place: tenant?.collegeAddress?.city || '', name: tenant?.name || '' };
+    }
 
-    // Merge stored fieldValues on top of auto-vars so manually-entered values
-    // (e.g. boolean, class, date_of_pass_of_month_and_year) always appear in the PDF.
+    const autoVars = buildAutoVars(student, cert.studentName, cert.usn, tenantInfo);
     const storedFieldValues =
       cert.fieldValues instanceof Map
         ? Object.fromEntries(cert.fieldValues)
         : cert.fieldValues || {};
     const vars = { ...autoVars, ...storedFieldValues };
 
-    // Warn if template has no body text — helps diagnose blank PDFs
-    const rawNotes = (tmpl.notes || '').trim();
-    if (!rawNotes) {
-      console.warn('[PDF] Template "%s" has empty notes — PDF body will be blank', tmpl.name);
-    }
-
-    // Strip dark-mode inline colors that would render invisible on white PDF background.
-    // This normalises pasted content that carries dark-theme background/foreground styles.
     const cleanNotes = (tmpl.notes || '').replace(
       /\bbackground(?:-color)?\s*:[^;}"']+/gi,
       'background-color:transparent'
     );
     const tmplForPdf = { ...(tmpl.toObject ? tmpl.toObject() : tmpl), notes: cleanNotes };
 
-    // Always rebuild HTML from notes + images — fullHtml is no longer stored in DB.
     const htmlContent = buildTemplateHtml(tmplForPdf);
     const finalHTML = substituteVars(htmlContent, vars);
 
-    // 🔥 Generate PDF using Puppeteer on-the-fly
     const options = await getLaunchOptions();
     const puppeteer = require('puppeteer-core');
     browser = await puppeteer.launch(options);
     const page = await browser.newPage();
-
-    // 794 px viewport width matches the template editor exactly.
-    // Use a tall initial height so content doesn't get clipped before measurement.
-    await page.setViewport({ width: 794, height: 4000, deviceScaleFactor: 1 });
-
+    await page.setViewport({
+      width: 794,
+      height: 1122,
+      deviceScaleFactor: 1,
+    });
     await page.setContent(finalHTML, { waitUntil: 'networkidle0' });
 
-    // Measure the true rendered height of the page BEFORE switching to print mode.
-    // This gives the actual content height at screen layout (794 px wide).
-    const contentHeight = await page.evaluate(() => {
-      const el = document.querySelector('.page');
-      return el ? el.scrollHeight : document.body.scrollHeight;
-    });
+    await page.emulateMediaType('screen');
 
-    // PDF page height = content height (minimum A4 = 1123 px).
-    // This keeps ALL content on a SINGLE page without scaling and without
-    // leaving blank space on the right (which happens when zoom shrinks the
-    // 794 px content into a narrower area of a fixed-width page).
-    const pdfHeight = Math.max(Math.ceil(contentHeight), 1123);
-    console.log(`[PDF] content height: ${contentHeight}px → PDF height: ${pdfHeight}px`);
-
-    // Switch to print media for correct colour rendering in the final PDF.
-    await page.emulateMediaType('print');
-
-    // width:'794px' guarantees the PDF page width == HTML layout width (794 px)
-    // with no DPI-conversion rounding that could leave a blank strip on the right.
     const pdfRaw = await page.pdf({
-      width: '794px',
-      height: `${pdfHeight}px`,
+      format: 'A4',
       printBackground: true,
-      margin: { top: '0mm', bottom: '0mm', left: '0mm', right: '0mm' },
+      margin: { top: 0, bottom: 0, left: 0, right: 0 },
+      displayHeaderFooter: false,
+      preferCSSPageSize: true,
     });
     const pdfBuffer = Buffer.isBuffer(pdfRaw) ? pdfRaw : Buffer.from(pdfRaw);
 
     await browser.close();
     browser = null;
 
-    // Stamp generatedDate + status on the certificate now that the PDF is ready
-    await Certificate.findByIdAndUpdate(cert._id, {
-      status: 'Generated',
-      generatedDate: new Date(),
-    });
+    if (cert.status !== 'Generated') {
+      await Certificate.findByIdAndUpdate(cert._id, {
+        status: 'Generated',
+        generatedDate: new Date(),
+      });
+    }
 
     const safeName = `${(cert.type || 'Certificate').replace(/\s+/g, '_')}_${cert.usn}.pdf`;
-
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
     res.setHeader('Content-Length', pdfBuffer.length);
     res.send(pdfBuffer);
   } catch (err) {
-    console.error('PDF API ERROR:', err);
-    if (browser) {
-      try {
-        await browser.close();
-      } catch (e) {
-        /* ignore */
-      }
-    }
+    console.error('PDF GENERATION ERROR:', err);
+    if (browser) await browser.close().catch(() => {});
     if (!res.headersSent) {
       res.status(500).json({ success: false, error: 'PDF generation failed: ' + err.message });
     }
   }
+}
+
+// GET /api/certificates/:id/download — SECURE DOWNLOAD
+router.get('/:id/download', async (req, res) => {
+  try {
+    const cert = await Certificate.findById(req.params.id).populate('templateId');
+    if (!cert) return res.status(404).json({ success: false, error: 'Certificate not found' });
+
+    // 1. Recovery & Initial status check
+    if (cert.status === 'Rejected' && cert.validationStatus === 'AUTO_REJECTED') {
+      console.log(
+        `[Lifecycle] Attempting self-healing recovery for rejected certificate ${cert._id}...`
+      );
+      const student = await Student.findOne({
+        $or: [{ student_id: cert.usn }, { email: cert.usn }],
+        isDeleted: { $ne: true },
+      });
+
+      if (student) {
+        const evaluation = CertificateApprovalService.evaluateCertificate(cert.type, student);
+        if (evaluation.isValid) {
+          console.log(`[Lifecycle] SUCCESS: Certificate ${cert._id} recovered automatically!`);
+          cert.status = 'Approved'; // Setting to Approved so it can be Generated below
+          cert.validationStatus = 'AUTO_APPROVED';
+          cert.validationErrors = [];
+          await cert.save();
+        }
+      }
+    }
+
+    if (cert.status !== 'Approved' && cert.status !== 'Generated') {
+      console.warn(
+        `[Security] Blocked download attempt for certificate ${cert._id} (Status: ${cert.status})`
+      );
+      const defaultReason =
+        cert.status === 'Rejected'
+          ? 'This certificate is rejected'
+          : 'Certificate is pending approval';
+      return res.status(403).json({
+        success: false,
+        message: 'Certificate cannot be generated',
+        reason:
+          cert.validationErrors?.length > 0 ? cert.validationErrors.join(', ') : defaultReason,
+        errors: [defaultReason],
+      });
+    }
+
+    // 2. Fetch latest student data for live validation (even if Approved/Generated)
+    const student = await Student.findOne({
+      $or: [{ student_id: cert.usn }, { email: cert.usn }],
+      isDeleted: { $ne: true },
+    });
+
+    if (!student) {
+      return res.status(404).json({ success: false, error: 'Associated student record not found' });
+    }
+
+    // 3. Live Validation (Skip if admin override exists or no validation required)
+    if (!cert.isOverridden && cert.requiresValidation !== false) {
+      const evaluation = CertificateApprovalService.evaluateCertificate(cert.type, student);
+      if (!evaluation.isValid) {
+        console.warn(
+          `[Security] Blocked download attempt for certificate ${cert._id} (Validation failed)`
+        );
+
+        // Return to rejected state if validation fails at download time
+        cert.status = 'Rejected';
+        cert.validationStatus = 'AUTO_REJECTED';
+        cert.validationErrors = evaluation.errors;
+        await cert.save();
+
+        return res.status(403).json({
+          success: false,
+          message: 'Certificate cannot be generated',
+          reason: evaluation.errors.join(', '),
+          errors: evaluation.errors,
+        });
+      }
+    } else {
+      console.log(`[Security] Admin override detected for ${cert._id} — bypassing live validation`);
+    }
+
+    // 4. Success — proceed to generate
+    await performPdfGeneration(cert, req, res);
+  } catch (err) {
+    console.error('DOWNLOAD API ERROR:', err);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// POST /api/certificates/:id/revalidate — Trigger a re-check of eligibility
+router.post('/:id/revalidate', async (req, res) => {
+  try {
+    const cert = await Certificate.findById(req.params.id);
+    if (!cert) return res.status(404).json({ success: false, error: 'Certificate not found' });
+
+    const student = await Student.findOne({
+      $or: [{ student_id: cert.usn }, { email: cert.usn }],
+      isDeleted: { $ne: true },
+    });
+    if (!student) return res.status(404).json({ success: false, error: 'Student not found' });
+
+    const evaluation = CertificateApprovalService.evaluateCertificate(cert.type, student);
+
+    if (evaluation.isValid) {
+      cert.status = 'Approved';
+      cert.validationStatus = 'AUTO_APPROVED';
+      cert.validationErrors = [];
+    } else {
+      cert.status = 'Rejected';
+      cert.validationStatus = 'AUTO_REJECTED';
+      cert.validationErrors = evaluation.errors;
+    }
+
+    await cert.save();
+    res.json({ success: true, data: cert });
+  } catch (err) {
+    console.error('REVALIDATE API ERROR:', err);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// GET /api/certificates/pdf/:id — Backwards compatibility (now points to secure download)
+router.get('/pdf/:id', (req, res) => {
+  res.redirect(307, `/api/certificates/${req.params.id}/download`);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
