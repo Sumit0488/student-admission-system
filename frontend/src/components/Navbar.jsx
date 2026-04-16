@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Bell, Sun, Moon, ChevronDown, Search } from 'lucide-react';
+import { Menu, Bell, Sun, Moon, ChevronDown, HelpCircle, Settings, GraduationCap } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-export default function Navbar({ darkMode, setDarkMode, onMenuClick, title = 'Dashboard' }) {
+const ACADEMIC_YEARS = ['2023-24', '2024-25', '2025-26', '2026-27'];
+
+export default function Navbar({ darkMode, setDarkMode, onMenuClick }) {
   const navigate = useNavigate();
   const { user, tenant, logout } = useAuth();
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [academicYear, setAcademicYear] = useState('2025-26');
 
   // ── Notification data ──────────────────────────────────────────────────────
   // Each item has a `route` — clicking it navigates there and closes the dropdown
@@ -72,32 +75,41 @@ export default function Navbar({ darkMode, setDarkMode, onMenuClick, title = 'Da
   };
 
   return (
-    <header className="sticky top-0 z-10 h-16 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex items-center px-4 sm:px-6 gap-4">
-      {/* Hamburger (mobile) */}
+    <header className="sticky top-0 z-10 h-14 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex items-center px-4 sm:px-5 gap-3">
+      {/* Mobile hamburger */}
       <button
         type="button"
         onClick={onMenuClick}
-        className="lg:hidden p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700"
+        className="lg:hidden p-1.5 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700"
       >
-        <Menu size={20} />
+        <Menu size={19} />
       </button>
 
-      {/* Page title */}
-      <div className="flex-1 min-w-0">
-        <h1 className="text-base font-semibold text-gray-800 dark:text-white truncate">{title}</h1>
-      </div>
+      {/* Institution name + dropdown */}
+      <button type="button" className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+        <div className="w-6 h-6 rounded-md bg-blue-600 flex items-center justify-center flex-shrink-0">
+          <GraduationCap size={13} className="text-white" />
+        </div>
+        <span className="hidden sm:block font-semibold text-sm text-gray-900 dark:text-white truncate max-w-[140px]">
+          {tenant?.name || 'EduAdmin'}
+        </span>
+        <ChevronDown size={13} className="text-gray-400 flex-shrink-0" />
+      </button>
 
-      {/* Search – desktop */}
-      <div className="hidden md:flex items-center gap-2 bg-gray-100 dark:bg-slate-700 rounded-lg px-3 py-2 w-56">
-        <Search size={15} className="text-gray-400 dark:text-slate-400 flex-shrink-0" />
-        <input
-          placeholder="Quick search..."
-          className="bg-transparent text-sm text-gray-700 dark:text-slate-200 placeholder-gray-400 dark:placeholder-slate-500 outline-none w-full"
-        />
-      </div>
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Academic Year selector */}
+      <select
+        value={academicYear}
+        onChange={(e) => setAcademicYear(e.target.value)}
+        className="hidden sm:block text-xs font-medium text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
+      >
+        {ACADEMIC_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+      </select>
 
       {/* Right actions */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
         {/* Dark mode */}
         <button
           type="button"
@@ -105,7 +117,25 @@ export default function Navbar({ darkMode, setDarkMode, onMenuClick, title = 'Da
           className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
           title="Toggle dark mode"
         >
-          {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+          {darkMode ? <Sun size={17} /> : <Moon size={17} />}
+        </button>
+
+        {/* Help */}
+        <button
+          type="button"
+          className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+          title="Help"
+        >
+          <HelpCircle size={17} />
+        </button>
+
+        {/* Settings */}
+        <button
+          type="button"
+          className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+          title="Settings"
+        >
+          <Settings size={17} />
         </button>
 
         {/* Notifications */}
@@ -118,7 +148,7 @@ export default function Navbar({ darkMode, setDarkMode, onMenuClick, title = 'Da
             }}
             className="relative p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
           >
-            <Bell size={18} />
+            <Bell size={17} />
             {unreadCount > 0 && (
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white dark:ring-slate-800" />
             )}
@@ -202,15 +232,12 @@ export default function Navbar({ darkMode, setDarkMode, onMenuClick, title = 'Da
               setProfileOpen((v) => !v);
               setNotifOpen(false);
             }}
-            className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+            className="flex items-center gap-1.5 px-1.5 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
           >
             <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
               {user?.name ? user.name.slice(0, 2).toUpperCase() : 'AD'}
             </div>
-            <span className="hidden sm:block text-sm font-medium text-gray-700 dark:text-slate-200">
-              {tenant?.name || user?.name || 'Admin'}
-            </span>
-            <ChevronDown size={14} className="text-gray-400 dark:text-slate-500" />
+            <ChevronDown size={13} className="text-gray-400 dark:text-slate-500 hidden sm:block" />
           </button>
 
           {profileOpen && (

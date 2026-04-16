@@ -4,7 +4,8 @@ import {
   LayoutDashboard, ClipboardList, Users, CheckCircle, Award,
   FileText, BarChart2, ScrollText, TrendingUp, CreditCard,
   Wallet, Banknote, ArrowLeftRight, ChevronDown,
-  GraduationCap, X, Search,
+  GraduationCap, X, Search, Receipt, PiggyBank, Settings,
+  ShoppingCart, UserCheck, Building2, ChevronRight,
 } from 'lucide-react';
 
 // ─── Nav structure ────────────────────────────────────────────────────────────
@@ -23,32 +24,86 @@ const NAV = [
           { label: 'Enquiry',   icon: Search,       to: '/admin/admissions/enquiry'   },
           { label: 'Students',  icon: Users,         to: '/admin/admissions/students'  },
           { label: 'Approvals', icon: CheckCircle,   to: '/admin/admissions/approvals' },
+          { label: 'Certificates', icon: Award,      to: '/admin/certificates'         },
+          { label: 'Forms',     icon: FileText,      to: '/admin/forms'                },
         ],
       },
 
-      { label: 'Certificates', icon: Award,    to: '/admin/certificates' },
-      { label: 'Forms',        icon: FileText, to: '/admin/forms'        },
-    ],
-  },
-  {
-    section: 'Reports & Tools',
-    items: [
       { label: 'Reports',          icon: BarChart2,  to: '/admin/reports'  },
       { label: 'Logs',             icon: ScrollText, to: '/admin/logs'     },
       { label: 'Promote Students', icon: TrendingUp, to: '/admin/promote'  },
     ],
   },
   {
-    section: 'Finance',
+    section: 'Fee Management',
     items: [
       {
         label: 'Fee Management',
         icon: CreditCard,
         prefix: '/admin/fee',
         children: [
-          { label: 'Fee Tracker',  icon: Wallet,         to: '/admin/fee/tracker'      },
-          { label: 'Collect Fee',  icon: Banknote,       to: '/admin/fee/collect'      },
-          { label: 'Transactions', icon: ArrowLeftRight, to: '/admin/fee/transactions' },
+          { label: 'Fee Tracker',    icon: Wallet,         to: '/admin/fee/tracker'       },
+          { label: 'Collect Fee',    icon: Banknote,       to: '/admin/fee/collect'       },
+          { label: 'Pay Records',    icon: Receipt,        to: '/admin/fee/pay-records'   },
+          { label: 'Transactions',   icon: ArrowLeftRight, to: '/admin/fee/transactions'  },
+          { label: 'Reports',        icon: BarChart2,      to: '/admin/fee/reports'       },
+          { label: 'Configuration',  icon: Settings,       to: '/admin/fee/configuration' },
+          { label: 'Logs',           icon: ScrollText,     to: '/admin/fee/logs'          },
+        ],
+      },
+    ],
+  },
+  {
+    section: 'General',
+    items: [
+      {
+        label: 'General',
+        icon: UserCheck,
+        prefix: '/admin/general',
+        children: [
+          { label: 'Students',    icon: Users,      to: '/admin/general/students'    },
+          { label: 'Scholarship', icon: Award,      to: '/admin/general/scholarship' },
+          { label: 'Bank Loan',   icon: Building2,  to: '/admin/general/bank-loan'   },
+          { label: 'Reports',     icon: BarChart2,  to: '/admin/general/reports'     },
+          { label: 'Logs',        icon: ScrollText, to: '/admin/general/logs'        },
+        ],
+      },
+    ],
+  },
+  {
+    section: 'Billing',
+    items: [
+      {
+        label: 'Billing',
+        icon: PiggyBank,
+        prefix: '/admin/billing',
+        children: [
+          { label: 'Customers',    icon: Users,         to: '/admin/billing/customers'    },
+          { label: 'Orders',       icon: ShoppingCart,  to: '/admin/billing/orders'       },
+          { label: 'Transactions', icon: ArrowLeftRight,to: '/admin/billing/transactions' },
+          { label: 'Pay Records',  icon: Receipt,       to: '/admin/billing/pay-records'  },
+          { label: 'Reports',      icon: BarChart2,     to: '/admin/billing/reports'      },
+          { label: 'Logs',         icon: ScrollText,    to: '/admin/billing/logs'         },
+        ],
+      },
+    ],
+  },
+  {
+    section: 'Configuration',
+    items: [
+      {
+        label: 'Configuration',
+        icon: Settings,
+        prefix: '/admin/config',
+        children: [
+          { label: 'General Setting',    icon: Building2,     to: '/admin/config/general'      },
+          { label: 'Academic Setting',   icon: GraduationCap, to: '/admin/config/academic'     },
+          { label: 'Student Onboarding', icon: UserCheck,     to: '/admin/config/onboarding'   },
+          { label: 'Admission Setting',  icon: ClipboardList, to: '/admin/config/admission'    },
+          { label: 'Fee Template',       icon: CreditCard,    to: '/admin/config/fee-template' },
+          { label: 'User Management',    icon: Users,         to: '/admin/config/users'        },
+          { label: 'Data Management',    icon: ScrollText,    to: '/admin/config/data'         },
+          { label: 'Integration',        icon: ArrowLeftRight,to: '/admin/config/integration'  },
         ],
       },
     ],
@@ -131,7 +186,7 @@ export default function Sidebar({ open, onClose }) {
       )}
 
       <aside
-        className={`fixed top-0 left-0 z-30 h-full w-64 bg-[#0f172a] flex flex-col transition-transform duration-300
+        className={`fixed top-0 left-0 z-30 h-full w-64 bg-[#1a2332] flex flex-col transition-transform duration-300
           ${open ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}
       >
         {/* Logo */}
@@ -151,7 +206,7 @@ export default function Sidebar({ open, onClose }) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6 scrollbar-hide">
+        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6 sidebar-scroll">
           {NAV.map((section) => (
             <div key={section.section}>
               <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">

@@ -11,6 +11,24 @@ const certRequestRoutes = require('./routes/certificate-request.routes');
 const masterDataRoutes = require('./routes/master-data.routes');
 const eligibilityRoutes = require('./routes/eligibility.routes');
 const authRoutes = require('./routes/auth.routes');
+// Fee Management routes
+const feeHeadRoutes = require('./routes/fee-head.routes');
+const feeCategoryRoutes = require('./routes/fee-category.routes');
+const feeStructureRoutes = require('./routes/fee-structure.routes');
+const feeScheduleRoutes = require('./routes/fee-schedule.routes');
+const feeOrderRoutes = require('./routes/fee-order.routes');
+const feeTransactionRoutes = require('./routes/fee-transaction.routes');
+const payRecordRoutes = require('./routes/pay-record.routes');
+const feeRefundRoutes = require('./routes/fee-refund.routes');
+// General routes
+const scholarshipRoutes = require('./routes/scholarship.routes');
+const bankLoanRoutes = require('./routes/bank-loan.routes');
+const generalStudentRoutes = require('./routes/general-student.routes');
+// Billing routes
+const billingCustomerRoutes = require('./routes/billing-customer.routes');
+const billingOrderRoutes = require('./routes/billing-order.routes');
+const billingTransactionRoutes = require('./routes/billing-transaction.routes');
+const billingPayRecordRoutes = require('./routes/billing-pay-record.routes');
 const { softAuth } = require('./middleware/auth');
 const { globalErrorHandler } = require('./utils/errorHandler');
 
@@ -75,6 +93,24 @@ app.use('/api/certificates', certRoutes);
 app.use('/api/certificate-requests', certRequestRoutes);
 app.use('/api/master-data', masterDataRoutes);
 app.use('/api/eligibility', eligibilityRoutes);
+// Fee Management
+app.use('/api/fee/heads', feeHeadRoutes);
+app.use('/api/fee/categories', feeCategoryRoutes);
+app.use('/api/fee/structures', feeStructureRoutes);
+app.use('/api/fee/schedules', feeScheduleRoutes);
+app.use('/api/fee/orders', feeOrderRoutes);
+app.use('/api/fee/transactions', feeTransactionRoutes);
+app.use('/api/fee/pay-records', payRecordRoutes);
+app.use('/api/fee/refunds', feeRefundRoutes);
+// General
+app.use('/api/general/students', generalStudentRoutes);
+app.use('/api/general/scholarships', scholarshipRoutes);
+app.use('/api/general/bank-loans', bankLoanRoutes);
+// Billing
+app.use('/api/billing/customers', billingCustomerRoutes);
+app.use('/api/billing/orders', billingOrderRoutes);
+app.use('/api/billing/transactions', billingTransactionRoutes);
+app.use('/api/billing/pay-records', billingPayRecordRoutes);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));

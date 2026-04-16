@@ -1,5 +1,9 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useUrlFilters } from '../hooks/useUrlFilters';
+import { useDebounce } from '../hooks/useDebounce';
+import { useToast } from '../hooks/useToast';
+import Toasts from '../components/Toasts';
 import {
   getStudents as apiGetStudents,
   getStatusCounts as apiGetCounts,
@@ -31,6 +35,12 @@ import {
   AlertCircle,
   Award,
   Loader2,
+  Mail,
+  MessageCircle,
+  LayoutList,
+  Clock,
+  Users,
+  Plus,
 } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import { submitCertificateRequest, getTemplates } from '../services/admissionsApi';
@@ -258,47 +268,7 @@ const normalize = (s) => ({
   createdAt: s.createdAt,
 });
 
-// ─── Debounce hook ────────────────────────────────────────────────────────────
-function useDebounce(value, delay = 350) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(t);
-  }, [value, delay]);
-  return debounced;
-}
-
-// ─── Toast ────────────────────────────────────────────────────────────────────
-function Toast({ toasts, remove }) {
-  return (
-    <div className="fixed top-5 right-5 z-50 space-y-2 pointer-events-none">
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-white text-sm font-medium pointer-events-auto
-            ${t.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}
-        >
-          {t.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-          {t.msg}
-          <button onClick={() => remove(t.id)} className="ml-2 opacity-70 hover:opacity-100">
-            <X size={14} />
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function useToast() {
-  const [toasts, setToasts] = useState([]);
-  const add = useCallback((msg, type = 'success') => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, msg, type }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
-  }, []);
-  const remove = useCallback((id) => setToasts((prev) => prev.filter((t) => t.id !== id)), []);
-  return { toasts, toast: add, remove };
-}
+// ─── (useDebounce, useToast, Toasts imported from shared hooks/components) ───
 
 // ─── Add Student Modal ────────────────────────────────────────────────────────
 const EMPTY = {
@@ -1160,17 +1130,23 @@ function SkeletonRow() {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function StudentsPage() {
   const navigate = useNavigate();
+
+  // ── URL-synced filter + pagination state ──────────────────────────────────
+  const [urlParams, setUrlParams] = useUrlFilters({
+    tab: 'Live', q: '', program: '', batch: '', page: '1',
+  });
+  const activeTab  = urlParams.tab;
+  const search     = urlParams.q;
+  const page       = Number(urlParams.page) || 1;
+  const filters    = { program: urlParams.program, batch: urlParams.batch };
+
   const [students, setStudents] = useState([]);
-  const [activeTab, setActiveTab] = useState('Live');
-  const [search, setSearch] = useState('');
   const [selected, setSelected] = useState([]);
-  const [page, setPage] = useState(1);
   const [openMenu, setOpenMenu] = useState(null);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [filters, setFilters] = useState({ program: '', batch: '' });
   const [filterPrograms, setFilterPrograms] = useState([]);
   const filterRef = useRef(null);
   const [tabCounts, setTabCounts] = useState({ Live: 0, Completed: 0, Cancelled: 0, Detained: 0 });
@@ -1234,14 +1210,8 @@ export default function StudentsPage() {
   }, [filterOpen]);
 
   const hasFilters = filters.program || filters.batch;
-  const removeFilter = (key) => {
-    setFilters((f) => ({ ...f, [key]: '' }));
-    setPage(1);
-  };
-  const clearAllFilters = () => {
-    setFilters({ program: '', batch: '' });
-    setPage(1);
-  };
+  const removeFilter = (key) => setUrlParams({ [key]: '' });
+  const clearAllFilters = () => setUrlParams({ program: '', batch: '' });
 
   // ── Fetch counts standalone (used after mutations) ──
   const fetchCounts = useCallback(async () => {
@@ -1298,10 +1268,7 @@ export default function StudentsPage() {
     };
   }, [activeTab, debouncedSearch, filters.program, filters.batch, page, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reset to page 1 whenever tab / search / filters change
-  useEffect(() => {
-    setPage(1);
-  }, [activeTab, debouncedSearch, filters.program, filters.batch]);
+  // page resets automatically via setUrlParams({ resetPage: true }) in every filter setter
 
   // Fetch dropdown config from backend once on mount
   useEffect(() => {
@@ -1331,19 +1298,14 @@ export default function StudentsPage() {
 
   // ── Tab change ──
   const handleTabChange = (tab) => {
-    console.log('[Tab] switched to:', tab);
-    setActiveTab(tab);
-    setPage(1);
-    setSearch('');
+    setUrlParams({ tab, q: '' }, { replace: false }); // push history entry for Back nav
     setSelected([]);
-    // filters are intentionally preserved on tab switch
   };
 
   // ── Add student — switch to that tab and refetch ──
   const handleStudentAdded = (newStudent) => {
     const n = normalize(newStudent);
-    setActiveTab(n.status);
-    setPage(1);
+    setUrlParams({ tab: n.status }, { replace: false });
     setRefreshKey((k) => k + 1);
     fetchCounts();
   };
@@ -1363,7 +1325,7 @@ export default function StudentsPage() {
       await apiDeleteStudent(deleteTarget.id);
       toast(`"${deleteTarget.fullName}" deleted successfully`);
       setDeleteTarget(null);
-      setPage(1);
+      setUrlParams({ page: '1' }, { resetPage: false });
       setRefreshKey((k) => k + 1);
       fetchCounts();
     } catch (err) {
@@ -1469,7 +1431,7 @@ export default function StudentsPage() {
 
   return (
     <>
-      <Toast toasts={toasts} remove={remove} />
+      <Toasts toasts={toasts} onRemove={remove} />
 
       {/* Modals */}
       {showAddModal && (
@@ -1517,7 +1479,7 @@ export default function StudentsPage() {
           student={statusTarget}
           onClose={() => setStatusTarget(null)}
           onSaved={() => {
-            setPage(1);
+            setUrlParams({ page: '1' }, { resetPage: false });
             setRefreshKey((k) => k + 1);
             fetchCounts();
           }}
@@ -1526,488 +1488,310 @@ export default function StudentsPage() {
         />
       )}
 
-      <div className="p-6 space-y-5">
+      <div className="p-6 space-y-0">
         {/* ── Page Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
           <div>
-            <p className="text-xs text-gray-400 dark:text-slate-500 mb-0.5">
-              Home / Admissions / Students
-            </p>
+            <p className="text-xs text-gray-400 dark:text-slate-500 mb-0.5">Home / Admissions / Students</p>
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">Student Management</h1>
           </div>
-        </div>
-
-        {/* ── Stats Row ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {TABS.map((tab) => (
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Export full report */}
             <button
-              key={tab}
-              onClick={() => handleTabChange(tab)}
-              className={`rounded-xl p-4 text-left border transition-all cursor-pointer
-                ${
-                  activeTab === tab
-                    ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-600/25'
-                    : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600'
-                }`}
+              onClick={handleExportReport}
+              disabled={exportingReport}
+              className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 px-3 py-2 rounded-lg disabled:opacity-50 transition-colors"
             >
-              <p
-                className={`text-2xl font-bold ${activeTab === tab ? 'text-white' : 'text-gray-900 dark:text-white'}`}
-              >
-                {tabCounts[tab]}
-              </p>
-              <p
-                className={`text-xs mt-0.5 font-medium ${activeTab === tab ? 'text-blue-100' : 'text-gray-500 dark:text-slate-400'}`}
-              >
-                {tab}
-              </p>
+              <Download size={13} /> {exportingReport ? 'Exporting...' : 'Full Report'}
             </button>
-          ))}
+            {/* Export by branch */}
+            <div className="flex items-center rounded-lg border border-gray-200 dark:border-slate-600 overflow-hidden">
+              <select
+                value={exportProgram}
+                onChange={(e) => setExportProgram(e.target.value)}
+                disabled={exporting}
+                className="text-xs text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-700 border-r border-gray-200 dark:border-slate-600 px-2 py-2 focus:outline-none disabled:opacity-50"
+              >
+                <option value="">All Branches</option>
+                {programs.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className="flex items-center gap-1 text-xs text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 px-3 py-2 disabled:opacity-50 transition-colors"
+              >
+                <Download size={13} /> {exporting ? 'Exporting...' : 'Export Excel'}
+              </button>
+            </div>
+            {/* Add Student */}
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={15} /> Add Student
+            </button>
+          </div>
         </div>
 
         {/* ── Table Card ── */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
-          {/* Toolbar */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 px-5 py-4 border-b border-gray-100 dark:border-slate-700">
-            <div className="relative flex-1 w-full sm:max-w-xs">
-              <Search
-                size={15}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500"
-              />
+
+          {/* ── View Toggle + Icon buttons row ── */}
+          <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100 dark:border-slate-700">
+            <div className="flex items-center gap-0">
+              <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400">
+                <LayoutList size={13} /> ListView
+              </button>
+              <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 border-b-2 border-transparent transition-colors">
+                <Clock size={13} /> Timeline
+              </button>
+            </div>
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                ref={filterRef}
+                onClick={() => setFilterOpen((v) => !v)}
+                className={`p-1.5 rounded-lg transition-colors ${filterOpen || hasFilters ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
+                title="Filters"
+              >
+                <SlidersHorizontal size={15} />
+                {hasFilters && <span className="sr-only">({[filters.program, filters.batch].filter(Boolean).length} active)</span>}
+              </button>
+              <button type="button" className="p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Group by">
+                <Users size={15} />
+              </button>
+            </div>
+          </div>
+
+          {/* ── Status tabs with counts ── */}
+          <div className="flex items-center px-5 border-b border-gray-100 dark:border-slate-700 overflow-x-auto gap-0">
+            {TABS.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => handleTabChange(tab)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors cursor-pointer -mb-px
+                  ${activeTab === tab
+                    ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-semibold'
+                    : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200'
+                  }`}
+              >
+                {tab}
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold
+                  ${activeTab === tab ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400'}`}>
+                  {tabCounts[tab] ?? 0}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* ── Search + Actions bar ── */}
+          <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-slate-700/50 flex-wrap">
+            {/* Select-all checkbox */}
+            <input
+              type="checkbox"
+              checked={allChecked}
+              ref={(el) => { if (el) el.indeterminate = someChecked; }}
+              onChange={toggleAll}
+              className="w-4 h-4 rounded border-gray-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer flex-shrink-0"
+            />
+
+            {/* Search input with filter icon inside */}
+            <div className="relative flex-1 min-w-[180px] max-w-xs" ref={filterRef}>
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
               <input
                 value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
+                onChange={(e) => setUrlParams({ q: e.target.value })}
                 placeholder={`Search ${activeTab.toLowerCase()} students...`}
-                className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-700 dark:text-slate-200 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                className="w-full pl-9 pr-9 py-2 text-sm bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-700 dark:text-slate-200 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
               />
-            </div>
-
-            <div className="flex items-center gap-2 ml-auto">
-              {/* ── Bulk action toolbar — shown only when rows are selected ── */}
-              {selected.length > 0 && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-lg">
-                    {selected.length} selected
-                  </span>
-
-                  {/* Change Status */}
-                  <div className="flex items-center rounded-lg border border-gray-200 dark:border-slate-600 overflow-hidden">
-                    <select
-                      value={bulkStatusValue}
-                      onChange={(e) => setBulkStatusValue(e.target.value)}
-                      disabled={bulkUpdating}
-                      className="text-xs text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-700 border-r border-gray-200 dark:border-slate-600 px-2 py-1.5 focus:outline-none disabled:opacity-50"
-                    >
-                      <option value="">Change Status…</option>
-                      {(config.statuses.length
-                        ? config.statuses
-                        : ['Live', 'Completed', 'Cancelled', 'Detained']
-                      ).map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      disabled={!bulkStatusValue || bulkUpdating}
-                      onClick={async () => {
-                        if (!bulkStatusValue) return;
-                        setBulkUpdating(true);
-                        try {
-                          const { data } = await apiBulkUpdate({
-                            studentIds: selected,
-                            action: 'status',
-                            value: bulkStatusValue,
-                          });
-                          toast(`${data.updated} student(s) updated to "${bulkStatusValue}"`);
-                          setSelected([]);
-                          setBulkStatusValue('');
-                          setPage(1);
-                          setRefreshKey((k) => k + 1);
-                          fetchCounts();
-                        } catch (err) {
-                          toast(err.response?.data?.error || 'Bulk update failed', 'error');
-                        } finally {
-                          setBulkUpdating(false);
-                        }
-                      }}
-                      className="text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {bulkUpdating ? 'Updating…' : 'Apply'}
-                    </button>
-                  </div>
-
-                  {/* Export Selected as CSV */}
-                  <button
-                    type="button"
-                    disabled={bulkExporting}
-                    onClick={async () => {
-                      setBulkExporting(true);
-                      try {
-                        const response = await apiBulkExport({ studentIds: selected });
-                        const url = URL.createObjectURL(
-                          new Blob([response.data], { type: 'text/csv' })
-                        );
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'selected_students.csv';
-                        a.click();
-                        URL.revokeObjectURL(url);
-                        toast(`Exported ${selected.length} student(s) to CSV`);
-                      } catch (err) {
-                        toast(err.response?.data?.error || 'Export failed', 'error');
-                      } finally {
-                        setBulkExporting(false);
-                      }
-                    }}
-                    className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
-                  >
-                    <Download size={13} /> {bulkExporting ? 'Exporting…' : 'Export CSV'}
-                  </button>
-
-                  {/* Delete selected */}
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!window.confirm(`Delete ${selected.length} student(s)?`)) return;
-                      const results = await Promise.allSettled(
-                        selected.map((id) => apiDeleteStudent(id))
-                      );
-                      const succeeded = selected.filter(
-                        (_, i) => results[i].status === 'fulfilled'
-                      );
-                      const failed = selected.length - succeeded.length;
-                      setSelected([]);
-                      setPage(1);
-                      setRefreshKey((k) => k + 1);
-                      fetchCounts();
-                      if (succeeded.length) toast(`${succeeded.length} student(s) deleted`);
-                      if (failed) toast(`${failed} delete(s) failed`, 'error');
-                    }}
-                    className="flex items-center gap-1.5 text-xs font-medium text-red-600 border border-red-200 dark:border-red-800 px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                  >
-                    <Trash2 size={13} /> Delete
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelected([]);
-                      setBulkStatusValue('');
-                    }}
-                    className="text-xs text-gray-500 dark:text-slate-400 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              )}
-
-              {/* ── Filter button + persistent panel ── */}
-              <div className="relative" ref={filterRef}>
-                <button
-                  type="button"
-                  onClick={() => setFilterOpen((v) => !v)}
-                  className={`flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition-colors cursor-pointer
-                    ${
-                      filterOpen
-                        ? 'bg-blue-600 border-blue-600 text-white'
-                        : 'text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700'
-                    }`}
-                >
-                  <SlidersHorizontal size={15} />
-                  Filter
-                  {hasFilters && (
-                    <span
-                      className={`min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center px-1
-                      ${filterOpen ? 'bg-white text-blue-600' : 'bg-blue-600 text-white'}`}
-                    >
-                      {[filters.program, filters.batch].filter(Boolean).length}
-                    </span>
-                  )}
-                </button>
-
-                {filterOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden">
-                    {/* Panel header */}
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-slate-700">
-                      <span className="text-sm font-semibold text-gray-800 dark:text-white">
-                        Filters
-                      </span>
-                      {hasFilters && (
-                        <button
-                          type="button"
-                          onClick={clearAllFilters}
-                          className="text-xs text-red-500 hover:text-red-600 font-medium transition-colors"
-                        >
-                          Clear all
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="p-3 space-y-4 max-h-[70vh] overflow-y-auto">
-                      {/* Program */}
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-2">
-                          Program
-                        </p>
-                        <div className="space-y-0.5">
-                          {filterPrograms.length === 0 && (
-                            <p className="text-xs text-gray-400 dark:text-slate-500 px-3 py-2">
-                              No programs found
-                            </p>
-                          )}
-                          {filterPrograms.map((p) => {
-                            const active = filters.program === p;
-                            return (
-                              <button
-                                key={p}
-                                type="button"
-                                onClick={() => {
-                                  setFilters((f) => ({ ...f, program: active ? '' : p }));
-                                  setPage(1);
-                                }}
-                                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors
-                                  ${
-                                    active
-                                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
-                                      : 'text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700'
-                                  }`}
-                              >
-                                <span>{p}</span>
-                                {active && (
-                                  <span className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
-                                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                                      <path
-                                        d="M1.5 4L3.5 6L6.5 2"
-                                        stroke="white"
-                                        strokeWidth="1.5"
-                                        strokeLinecap="round"
-                                      />
-                                    </svg>
-                                  </span>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Batch */}
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-2">
-                          Batch
-                        </p>
-                        <div className="space-y-0.5">
-                          {batches.map((b) => {
-                            const active = filters.batch === b;
-                            return (
-                              <button
-                                key={b}
-                                type="button"
-                                onClick={() => {
-                                  setFilters((f) => ({ ...f, batch: active ? '' : b }));
-                                  setPage(1);
-                                }}
-                                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors
-                                  ${
-                                    active
-                                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
-                                      : 'text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700'
-                                  }`}
-                              >
-                                <span>{b}</span>
-                                {active && (
-                                  <span className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
-                                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                                      <path
-                                        d="M1.5 4L3.5 6L6.5 2"
-                                        stroke="white"
-                                        strokeWidth="1.5"
-                                        strokeLinecap="round"
-                                      />
-                                    </svg>
-                                  </span>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Panel footer — close */}
-                    <div className="px-4 py-3 border-t border-gray-100 dark:border-slate-700">
-                      <button
-                        type="button"
-                        onClick={() => setFilterOpen(false)}
-                        className="w-full py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                      >
-                        Done
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* ── Full Report: all students by status ── */}
               <button
-                onClick={handleExportReport}
-                disabled={exportingReport}
-                title="Export all students grouped by status (Live / Completed / Cancelled / Detained)"
-                className="flex items-center gap-1.5 text-sm text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 px-3 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                type="button"
+                onClick={() => setFilterOpen((v) => !v)}
+                className={`absolute right-2.5 top-1/2 -translate-y-1/2 transition-colors ${filterOpen || hasFilters ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600 dark:hover:text-slate-300'}`}
+                title="Filters"
               >
-                {exportingReport ? (
-                  <>
-                    <svg
-                      className="animate-spin w-3.5 h-3.5 flex-shrink-0"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                      />
-                    </svg>
-                    Exporting...
-                  </>
-                ) : (
-                  <>
-                    <Download size={15} className="flex-shrink-0" />
-                    Full Report
-                  </>
-                )}
+                <SlidersHorizontal size={14} />
               </button>
 
-              {/* ── Export Live Students: branch select + button grouped ── */}
-              <div className="flex items-center rounded-lg border border-gray-200 dark:border-slate-600 overflow-hidden">
-                <select
-                  value={exportProgram}
-                  onChange={(e) => setExportProgram(e.target.value)}
-                  disabled={exporting}
-                  className="text-sm text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-700 border-r border-gray-200 dark:border-slate-600 px-2 py-2 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">All Branches</option>
-                  {programs.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
+              {/* Filter dropdown panel */}
+              {filterOpen && (
+                <div className="absolute left-0 top-full mt-2 w-72 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-slate-700">
+                    <span className="text-sm font-semibold text-gray-800 dark:text-white">Filters</span>
+                    {hasFilters && (
+                      <button type="button" onClick={clearAllFilters} className="text-xs text-red-500 hover:text-red-600 font-medium transition-colors">
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+                  <div className="p-3 space-y-4 max-h-[70vh] overflow-y-auto">
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-2">Program</p>
+                      <div className="space-y-0.5">
+                        {filterPrograms.length === 0 && (
+                          <p className="text-xs text-gray-400 dark:text-slate-500 px-3 py-2">No programs found</p>
+                        )}
+                        {filterPrograms.map((p) => {
+                          const active = filters.program === p;
+                          return (
+                            <button key={p} type="button" onClick={() => setUrlParams({ program: active ? '' : p })}
+                              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors
+                                ${active ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>
+                              <span>{p}</span>
+                              {active && <span className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0"><svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3.5 6L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" /></svg></span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-2">Batch</p>
+                      <div className="space-y-0.5">
+                        {batches.map((b) => {
+                          const active = filters.batch === b;
+                          return (
+                            <button key={b} type="button" onClick={() => setUrlParams({ batch: active ? '' : b })}
+                              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors
+                                ${active ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>
+                              <span>{b}</span>
+                              {active && <span className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0"><svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3.5 6L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" /></svg></span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="px-4 py-3 border-t border-gray-100 dark:border-slate-700">
+                    <button type="button" onClick={() => setFilterOpen(false)}
+                      className="w-full py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+                      Done
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Record count */}
+            <span className="text-xs text-gray-500 dark:text-slate-400 whitespace-nowrap">
+              from <span className="font-semibold text-gray-700 dark:text-slate-300">{total.toLocaleString()}</span> Students
+            </span>
+
+            {/* Bulk actions — shown when rows are selected */}
+            {selected.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 rounded-lg">
+                  {selected.length} selected
+                </span>
+                <div className="flex items-center rounded-lg border border-gray-200 dark:border-slate-600 overflow-hidden">
+                  <select
+                    value={bulkStatusValue}
+                    onChange={(e) => setBulkStatusValue(e.target.value)}
+                    disabled={bulkUpdating}
+                    className="text-xs text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-700 border-r border-gray-200 dark:border-slate-600 px-2 py-1.5 focus:outline-none disabled:opacity-50"
+                  >
+                    <option value="">Change Status…</option>
+                    {(config.statuses.length ? config.statuses : ['Live', 'Completed', 'Cancelled', 'Detained']).map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!bulkStatusValue || bulkUpdating}
+                    onClick={async () => {
+                      if (!bulkStatusValue) return;
+                      setBulkUpdating(true);
+                      try {
+                        const { data } = await apiBulkUpdate({ studentIds: selected, action: 'status', value: bulkStatusValue });
+                        toast(`${data.updated} student(s) updated to "${bulkStatusValue}"`);
+                        setSelected([]); setBulkStatusValue('');
+                        setUrlParams({ page: '1' }, { resetPage: false });
+                        setRefreshKey((k) => k + 1); fetchCounts();
+                      } catch (err) {
+                        toast(err.response?.data?.error || 'Bulk update failed', 'error');
+                      } finally { setBulkUpdating(false); }
+                    }}
+                    className="text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 disabled:opacity-40 transition-colors"
+                  >
+                    {bulkUpdating ? 'Updating…' : 'Apply'}
+                  </button>
+                </div>
                 <button
-                  onClick={handleExport}
-                  disabled={exporting}
-                  title="Export Live students to CSV"
-                  className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                  type="button"
+                  disabled={bulkExporting}
+                  onClick={async () => {
+                    setBulkExporting(true);
+                    try {
+                      const response = await apiBulkExport({ studentIds: selected });
+                      const url = URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }));
+                      const a = document.createElement('a'); a.href = url; a.download = 'selected_students.csv'; a.click(); URL.revokeObjectURL(url);
+                      toast(`Exported ${selected.length} student(s) to CSV`);
+                    } catch (err) { toast(err.response?.data?.error || 'Export failed', 'error'); }
+                    finally { setBulkExporting(false); }
+                  }}
+                  className="flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
                 >
-                  {exporting ? (
-                    <>
-                      <svg
-                        className="animate-spin w-3.5 h-3.5 flex-shrink-0"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                        />
-                      </svg>
-                      Exporting...
-                    </>
-                  ) : (
-                    <>
-                      <Download size={15} className="flex-shrink-0" />
-                      Export Excel
-                    </>
-                  )}
+                  <Download size={12} /> {bulkExporting ? 'Exporting…' : 'Export CSV'}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!window.confirm(`Delete ${selected.length} student(s)?`)) return;
+                    const results = await Promise.allSettled(selected.map((id) => apiDeleteStudent(id)));
+                    const succeeded = selected.filter((_, i) => results[i].status === 'fulfilled');
+                    const failed = selected.length - succeeded.length;
+                    setSelected([]);
+                    setUrlParams({ page: '1' }, { resetPage: false });
+                    setRefreshKey((k) => k + 1); fetchCounts();
+                    if (succeeded.length) toast(`${succeeded.length} student(s) deleted`);
+                    if (failed) toast(`${failed} delete(s) failed`, 'error');
+                  }}
+                  className="flex items-center gap-1 text-xs font-medium text-red-600 border border-red-200 dark:border-red-800 px-2.5 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                >
+                  <Trash2 size={12} /> Delete
+                </button>
+                <button type="button" onClick={() => { setSelected([]); setBulkStatusValue(''); }}
+                  className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                  <X size={13} />
                 </button>
               </div>
+            )}
+
+            {/* Right-aligned action icons */}
+            <div className="ml-auto flex items-center gap-1">
+              <button type="button" title="Send Email"
+                className="p-2 rounded-lg text-gray-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                <Mail size={15} />
+              </button>
+              <button type="button" title="Send WhatsApp"
+                className="p-2 rounded-lg text-gray-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
+                <MessageCircle size={15} />
+              </button>
+              <button type="button" title="Download" onClick={handleExport} disabled={exporting}
+                className="p-2 rounded-lg text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50">
+                <Download size={15} />
+              </button>
             </div>
           </div>
 
           {/* ── Active filter chips ── */}
           {hasFilters && (
-            <div className="flex items-center gap-2 px-5 py-2.5 border-b border-gray-100 dark:border-slate-700 flex-wrap">
-              <span className="text-[11px] text-gray-400 dark:text-slate-500 font-medium">
-                Active filters:
-              </span>
+            <div className="flex items-center gap-2 px-5 py-2 border-b border-gray-50 dark:border-slate-700/50 flex-wrap">
+              <span className="text-[11px] text-gray-400 dark:text-slate-500 font-medium">Filters:</span>
               {filters.program && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
                   {filters.program}
-                  <button
-                    type="button"
-                    onClick={() => removeFilter('program')}
-                    className="hover:text-blue-900 dark:hover:text-blue-100 transition-colors"
-                  >
-                    <X size={11} />
-                  </button>
+                  <button type="button" onClick={() => removeFilter('program')}><X size={10} /></button>
                 </span>
               )}
               {filters.batch && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">
                   {filters.batch}
-                  <button
-                    type="button"
-                    onClick={() => removeFilter('batch')}
-                    className="hover:text-purple-900 dark:hover:text-purple-100 transition-colors"
-                  >
-                    <X size={11} />
-                  </button>
+                  <button type="button" onClick={() => removeFilter('batch')}><X size={10} /></button>
                 </span>
               )}
-              <button
-                type="button"
-                onClick={clearAllFilters}
-                className="text-[11px] text-red-500 hover:text-red-600 font-medium ml-1 transition-colors"
-              >
-                Clear all
-              </button>
+              <button type="button" onClick={clearAllFilters} className="text-[11px] text-red-500 hover:text-red-600 font-medium transition-colors">Clear all</button>
             </div>
           )}
-
-          {/* Tab strip */}
-          <div className="flex items-center border-b border-gray-100 dark:border-slate-700 px-5 gap-1 overflow-x-auto">
-            {TABS.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => handleTabChange(tab)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors cursor-pointer
-                  ${
-                    activeTab === tab
-                      ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                      : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200'
-                  }`}
-              >
-                {tab}
-                <span
-                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold
-                  ${activeTab === tab ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400'}`}
-                >
-                  {tabCounts[tab]}
-                </span>
-              </button>
-            ))}
-          </div>
 
           {/* Table */}
           <div className="overflow-x-auto">
@@ -2169,7 +1953,7 @@ export default function StudentsPage() {
               </p>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  onClick={() => setUrlParams({ page: String(Math.max(1, page - 1)) }, { resetPage: false })}
                   disabled={safePage === 1}
                   className="p-1.5 rounded-lg border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
@@ -2178,7 +1962,7 @@ export default function StudentsPage() {
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                   <button
                     key={p}
-                    onClick={() => setPage(p)}
+                    onClick={() => setUrlParams({ page: String(p) }, { resetPage: false })}
                     className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors
                       ${p === safePage ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
                   >
@@ -2186,7 +1970,7 @@ export default function StudentsPage() {
                   </button>
                 ))}
                 <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  onClick={() => setUrlParams({ page: String(Math.min(totalPages, page + 1)) }, { resetPage: false })}
                   disabled={safePage === totalPages}
                   className="p-1.5 rounded-lg border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >

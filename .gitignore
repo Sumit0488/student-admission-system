@@ -42,3 +42,12 @@ coverage/
 .local-chromium/
 
 .vercel
+
+# ── Large/unnecessary files ───────────────────────────────────────────────────
+*.zip
+*.png
+*.jpg
+*.jpeg
+ERP_FEEPAY-master/
+lambda-layers/
+.claude/

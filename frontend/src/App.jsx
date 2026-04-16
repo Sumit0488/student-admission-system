@@ -14,6 +14,36 @@ import CertificatesPage from './pages/admissions/CertificatesPage';
 import TemplateEditorPage from './pages/admissions/TemplateEditorPage';
 import CertificateRequestPage from './pages/student/CertificateRequestPage';
 
+// Fee Management pages
+import FeeTrackerPage from './pages/fee/FeeTrackerPage';
+import FeeScheduleDetailPage from './pages/fee/FeeScheduleDetailPage';
+import CollectFeePage from './pages/fee/CollectFeePage';
+import PayRecordsPage from './pages/fee/PayRecordsPage';
+import TransactionsPage from './pages/fee/TransactionsPage';
+import FeeReportsPage from './pages/fee/FeeReportsPage';
+import FeeConfigPage from './pages/fee/FeeConfigPage';
+import FeeLogsPage from './pages/fee/FeeLogsPage';
+import BulkUploadOrdersPage from './pages/fee/BulkUploadOrdersPage';
+import BulkUploadPaymentsPage from './pages/fee/BulkUploadPaymentsPage';
+
+// General pages
+import GeneralStudentsPage from './pages/general/GeneralStudentsPage';
+import ScholarshipPage from './pages/general/ScholarshipPage';
+import BankLoanPage from './pages/general/BankLoanPage';
+import GeneralReportsPage from './pages/general/GeneralReportsPage';
+import GeneralLogsPage from './pages/general/GeneralLogsPage';
+
+// Config pages
+import ConfigurationPage from './pages/config/ConfigurationPage';
+
+// Billing pages
+import BillingCustomersPage from './pages/billing/BillingCustomersPage';
+import BillingOrdersPage from './pages/billing/BillingOrdersPage';
+import BillingTransactionsPage from './pages/billing/BillingTransactionsPage';
+import BillingPayRecordsPage from './pages/billing/BillingPayRecordsPage';
+import BillingReportsPage from './pages/billing/BillingReportsPage';
+import BillingLogsPage from './pages/billing/BillingLogsPage';
+
 // Placeholder for routes not yet built
 const Placeholder = ({ name }) => (
   <div className="p-8 text-center text-gray-400 dark:text-slate-500">
@@ -58,9 +88,43 @@ export default function App() {
         <Route path="/admin/reports" element={<Placeholder name="Reports" />} />
         <Route path="/admin/logs" element={<Placeholder name="Activity Logs" />} />
         <Route path="/admin/promote" element={<Placeholder name="Promote Students" />} />
-        <Route path="/admin/fee/tracker" element={<Placeholder name="Fee Tracker" />} />
-        <Route path="/admin/fee/collect" element={<Placeholder name="Collect Fee" />} />
-        <Route path="/admin/fee/transactions" element={<Placeholder name="Transactions" />} />
+
+        {/* ── Fee Management ────────────────────────────────────────────────── */}
+        <Route path="/admin/fee/tracker" element={<FeeTrackerPage />} />
+        <Route path="/admin/fee/tracker/:id" element={<FeeScheduleDetailPage />} />
+        <Route path="/admin/fee/tracker/:id/bulk-upload-orders" element={<BulkUploadOrdersPage />} />
+        <Route path="/admin/fee/bulk-upload-payments" element={<BulkUploadPaymentsPage />} />
+        <Route path="/admin/fee/collect" element={<CollectFeePage />} />
+        <Route path="/admin/fee/pay-records" element={<PayRecordsPage />} />
+        <Route path="/admin/fee/transactions" element={<TransactionsPage />} />
+        <Route path="/admin/fee/reports" element={<FeeReportsPage />} />
+        <Route path="/admin/fee/configuration" element={<FeeConfigPage />} />
+        <Route path="/admin/fee/logs" element={<FeeLogsPage />} />
+
+        {/* ── Configuration ────────────────────────────────────────────────── */}
+        <Route path="/admin/config/general"      element={<ConfigurationPage section="general"      />} />
+        <Route path="/admin/config/academic"     element={<ConfigurationPage section="academic"     />} />
+        <Route path="/admin/config/onboarding"   element={<ConfigurationPage section="onboarding"   />} />
+        <Route path="/admin/config/admission"    element={<ConfigurationPage section="admission"    />} />
+        <Route path="/admin/config/fee-template" element={<ConfigurationPage section="fee-template" />} />
+        <Route path="/admin/config/users"        element={<ConfigurationPage section="users"        />} />
+        <Route path="/admin/config/data"         element={<ConfigurationPage section="data"         />} />
+        <Route path="/admin/config/integration"  element={<ConfigurationPage section="integration"  />} />
+
+        {/* ── General ──────────────────────────────────────────────────────── */}
+        <Route path="/admin/general/students" element={<GeneralStudentsPage />} />
+        <Route path="/admin/general/scholarship" element={<ScholarshipPage />} />
+        <Route path="/admin/general/bank-loan" element={<BankLoanPage />} />
+        <Route path="/admin/general/reports" element={<GeneralReportsPage />} />
+        <Route path="/admin/general/logs" element={<GeneralLogsPage />} />
+
+        {/* ── Billing ──────────────────────────────────────────────────────── */}
+        <Route path="/admin/billing/customers" element={<BillingCustomersPage />} />
+        <Route path="/admin/billing/orders" element={<BillingOrdersPage />} />
+        <Route path="/admin/billing/transactions" element={<BillingTransactionsPage />} />
+        <Route path="/admin/billing/pay-records" element={<BillingPayRecordsPage />} />
+        <Route path="/admin/billing/reports" element={<BillingReportsPage />} />
+        <Route path="/admin/billing/logs" element={<BillingLogsPage />} />
 
         {/* ── Admissions sub-section: sidebar + tab strip ──────────────────── */}
         <Route element={<AdmissionsLayout />}>

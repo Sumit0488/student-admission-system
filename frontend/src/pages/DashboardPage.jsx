@@ -10,9 +10,14 @@ import {
   Clock,
   CheckCircle,
   Layout,
+  IndianRupee,
+  Wallet,
+  CircleDollarSign,
+  BarChart3,
 } from 'lucide-react';
 import { getStudents as apiGetStudents } from '../services/studentApi';
 import { getCertificates, getTemplates } from '../services/admissionsApi';
+import { getFeeOrders } from '../services/feeApi';
 import StatusBadge from '../components/StatusBadge';
 
 export default function DashboardPage() {
@@ -21,6 +26,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [certStats, setCertStats] = useState({ total: 0, pending: 0, generated: 0, templates: 0 });
   const [certLoading, setCertLoading] = useState(true);
+  const [feeStats, setFeeStats] = useState({ totalAmount: 0, paidAmount: 0, dueAmount: 0, orderCount: 0 });
+  const [feeLoading, setFeeLoading] = useState(true);
 
   useEffect(() => {
     console.log('[Dashboard] GET /api/students');
@@ -31,6 +38,19 @@ export default function DashboardPage() {
       })
       .catch((err) => console.error('[Dashboard] Fetch error:', err.message))
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    getFeeOrders({ limit: 2000 })
+      .then(({ data }) => {
+        const orders = data.data || [];
+        const totalAmount = orders.reduce((s, o) => s + (o.fee_order_amount || 0), 0);
+        const paidAmount = orders.reduce((s, o) => s + (o.fee_paid_amount || 0), 0);
+        const dueAmount = orders.reduce((s, o) => s + (o.fee_due_amount || 0), 0);
+        setFeeStats({ totalAmount, paidAmount, dueAmount, orderCount: orders.length });
+      })
+      .catch(() => {})
+      .finally(() => setFeeLoading(false));
   }, []);
 
   useEffect(() => {
@@ -64,7 +84,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       {/* Welcome */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl p-6 text-white">
         <p className="text-blue-200 text-sm mb-1">Welcome back,</p>
@@ -98,6 +118,69 @@ export default function DashboardPage() {
             </p>
           </div>
         ))}
+      </div>
+
+      {/* Fee Overview */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-700">
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-white">Fee Overview</h3>
+          <Link to="/admin/fee/tracker" className="text-xs text-blue-600 font-medium hover:underline">
+            Fee Tracker →
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-gray-100 dark:divide-slate-700">
+          {[
+            {
+              label: 'Total Orders',
+              value: feeStats.orderCount,
+              sub: null,
+              icon: ClipboardList,
+              color: 'bg-slate-700',
+            },
+            {
+              label: 'Total Fee Amount',
+              value: `₹${(feeStats.totalAmount / 1000).toFixed(1)}K`,
+              sub: feeStats.totalAmount >= 100000 ? `₹${(feeStats.totalAmount / 100000).toFixed(2)}L` : null,
+              icon: IndianRupee,
+              color: 'bg-blue-600',
+            },
+            {
+              label: 'Amount Collected',
+              value: `₹${(feeStats.paidAmount / 1000).toFixed(1)}K`,
+              sub: feeStats.totalAmount > 0 ? `${((feeStats.paidAmount / feeStats.totalAmount) * 100).toFixed(1)}% collected` : null,
+              icon: Wallet,
+              color: 'bg-green-600',
+            },
+            {
+              label: 'Pending Amount',
+              value: `₹${(feeStats.dueAmount / 1000).toFixed(1)}K`,
+              sub: feeStats.totalAmount > 0 ? `${((feeStats.dueAmount / feeStats.totalAmount) * 100).toFixed(1)}% pending` : null,
+              icon: CircleDollarSign,
+              color: 'bg-orange-500',
+            },
+          ].map((card) => (
+            <div key={card.label} className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wide">
+                  {card.label}
+                </p>
+                <div className={`w-8 h-8 rounded-lg ${card.color} flex items-center justify-center`}>
+                  <card.icon size={16} className="text-white" />
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {feeLoading ? (
+                  <span className="inline-block w-16 h-7 bg-gray-200 dark:bg-slate-700 rounded animate-pulse" />
+                ) : (
+                  card.value
+                )}
+              </p>
+              {card.sub && !feeLoading && (
+                <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">{card.sub}</p>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Certificate Overview */}
