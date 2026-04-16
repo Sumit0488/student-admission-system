@@ -1,10 +1,12 @@
 const express = require('express');
+const { getTenantFilter } = require('../utils/tenantFilter');
 const router = express.Router();
 const BillingCustomer = require('../models/billing-customer.model');
 
 router.get('/', async (req, res) => {
   try {
-    const filter = {};
+    const tf = getTenantFilter(req.tenantId);
+    const filter = { ...tf };
     if (req.query.status) filter.status = req.query.status;
 
     const page = parseInt(req.query.page) || 1;
@@ -23,7 +25,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const doc = new BillingCustomer(req.body);
+    const doc = new BillingCustomer({ ...req.body, ...(req.tenantId && { tenantId: req.tenantId }) });
     await doc.save();
     res.status(201).json({ success: true, data: doc });
   } catch (err) {

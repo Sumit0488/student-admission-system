@@ -35,6 +35,12 @@ import GeneralLogsPage from './pages/general/GeneralLogsPage';
 
 // Config pages
 import ConfigurationPage from './pages/config/ConfigurationPage';
+import StreamPage from './pages/config/StreamPage';
+import UserManagementPage from './pages/config/UserManagementPage';
+import AcademicSettingsPage from './pages/config/AcademicSettingsPage';
+
+// Super Admin pages
+import SuperAdminPage from './pages/superadmin/SuperAdminPage';
 
 // Billing pages
 import BillingCustomersPage from './pages/billing/BillingCustomersPage';
@@ -43,6 +49,31 @@ import BillingTransactionsPage from './pages/billing/BillingTransactionsPage';
 import BillingPayRecordsPage from './pages/billing/BillingPayRecordsPage';
 import BillingReportsPage from './pages/billing/BillingReportsPage';
 import BillingLogsPage from './pages/billing/BillingLogsPage';
+
+// Library pages
+import LibraryStudentsPage from './pages/library/LibraryStudentsPage';
+import LibraryTransactionsPage from './pages/library/LibraryTransactionsPage';
+import LibraryFineReportPage from './pages/library/LibraryFineReportPage';
+import LibraryReportsPage from './pages/library/LibraryReportsPage';
+import LibraryLogsPage from './pages/library/LibraryLogsPage';
+
+// Hostel pages
+import HostelStudentsPage from './pages/hostel/HostelStudentsPage';
+import HostelAssetsPage from './pages/hostel/HostelAssetsPage';
+import HostelEventsPage from './pages/hostel/HostelEventsPage';
+import HostelTimesheetPage from './pages/hostel/HostelTimesheetPage';
+import HostelDevicePage from './pages/hostel/HostelDevicePage';
+import HostelTransactionsPage from './pages/hostel/HostelTransactionsPage';
+import HostelReportsPage from './pages/hostel/HostelReportsPage';
+
+// Alumni pages
+import AlumniListPage from './pages/alumni/AlumniListPage';
+import AlumniReportsPage from './pages/alumni/AlumniReportsPage';
+
+// Main menu pages
+import ReportsPage from './pages/ReportsPage';
+import LogsPage from './pages/LogsPage';
+import PromoteStudentsPage from './pages/PromoteStudentsPage';
 
 // Placeholder for routes not yet built
 const Placeholder = ({ name }) => (
@@ -85,9 +116,9 @@ export default function App() {
         {/* Other sidebar pages */}
         <Route path="/admin/finance" element={<Placeholder name="Finance" />} />
         <Route path="/admin/forms" element={<Placeholder name="Forms" />} />
-        <Route path="/admin/reports" element={<Placeholder name="Reports" />} />
-        <Route path="/admin/logs" element={<Placeholder name="Activity Logs" />} />
-        <Route path="/admin/promote" element={<Placeholder name="Promote Students" />} />
+        <Route path="/admin/reports" element={<ReportsPage />} />
+        <Route path="/admin/logs" element={<LogsPage />} />
+        <Route path="/admin/promote" element={<PromoteStudentsPage />} />
 
         {/* ── Fee Management ────────────────────────────────────────────────── */}
         <Route path="/admin/fee/tracker" element={<FeeTrackerPage />} />
@@ -102,12 +133,14 @@ export default function App() {
         <Route path="/admin/fee/logs" element={<FeeLogsPage />} />
 
         {/* ── Configuration ────────────────────────────────────────────────── */}
+        <Route path="/admin/config" element={<Navigate to="/admin/config/general" replace />} />
         <Route path="/admin/config/general"      element={<ConfigurationPage section="general"      />} />
-        <Route path="/admin/config/academic"     element={<ConfigurationPage section="academic"     />} />
+        <Route path="/admin/config/academic"        element={<AcademicSettingsPage />} />
+        <Route path="/admin/config/academic/streams" element={<StreamPage />} />
         <Route path="/admin/config/onboarding"   element={<ConfigurationPage section="onboarding"   />} />
         <Route path="/admin/config/admission"    element={<ConfigurationPage section="admission"    />} />
         <Route path="/admin/config/fee-template" element={<ConfigurationPage section="fee-template" />} />
-        <Route path="/admin/config/users"        element={<ConfigurationPage section="users"        />} />
+        <Route path="/admin/config/users"        element={<UserManagementPage />} />
         <Route path="/admin/config/data"         element={<ConfigurationPage section="data"         />} />
         <Route path="/admin/config/integration"  element={<ConfigurationPage section="integration"  />} />
 
@@ -125,6 +158,29 @@ export default function App() {
         <Route path="/admin/billing/pay-records" element={<BillingPayRecordsPage />} />
         <Route path="/admin/billing/reports" element={<BillingReportsPage />} />
         <Route path="/admin/billing/logs" element={<BillingLogsPage />} />
+
+        {/* ── Library ──────────────────────────────────────────────────────── */}
+        <Route path="/admin/library/members" element={<LibraryStudentsPage />} />
+        <Route path="/admin/library/transactions" element={<LibraryTransactionsPage />} />
+        <Route path="/admin/library/fine-report" element={<LibraryFineReportPage />} />
+        <Route path="/admin/library/reports" element={<LibraryReportsPage />} />
+        <Route path="/admin/library/logs" element={<LibraryLogsPage />} />
+
+        {/* ── Hostel ───────────────────────────────────────────────────────── */}
+        <Route path="/admin/hostel/students" element={<HostelStudentsPage />} />
+        <Route path="/admin/hostel/assets" element={<HostelAssetsPage />} />
+        <Route path="/admin/hostel/events" element={<HostelEventsPage />} />
+        <Route path="/admin/hostel/timesheet" element={<HostelTimesheetPage />} />
+        <Route path="/admin/hostel/devices" element={<HostelDevicePage />} />
+        <Route path="/admin/hostel/transactions" element={<HostelTransactionsPage />} />
+        <Route path="/admin/hostel/reports" element={<HostelReportsPage />} />
+
+        {/* ── Super Admin ──────────────────────────────────────────────────── */}
+        <Route path="/admin/super-admin" element={<SuperAdminPage />} />
+
+        {/* ── Alumni ───────────────────────────────────────────────────────── */}
+        <Route path="/admin/alumni/list" element={<AlumniListPage />} />
+        <Route path="/admin/alumni/reports" element={<AlumniReportsPage />} />
 
         {/* ── Admissions sub-section: sidebar + tab strip ──────────────────── */}
         <Route element={<AdmissionsLayout />}>

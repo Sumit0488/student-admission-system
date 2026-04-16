@@ -1,10 +1,12 @@
 const express = require('express');
+const { getTenantFilter } = require('../utils/tenantFilter');
 const router = express.Router();
 const Scholarship = require('../models/scholarship.model');
 
 router.get('/', async (req, res) => {
   try {
-    const filter = {};
+    const tf = getTenantFilter(req.tenantId);
+    const filter = { ...tf };
     if (req.query.status) filter.scholarship_status = req.query.status;
     if (req.query.academic_year) filter.academic_year = req.query.academic_year;
     if (req.query.student_id) filter.student_id = req.query.student_id;
@@ -17,7 +19,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const doc = new Scholarship(req.body);
+    const doc = new Scholarship({ ...req.body, ...(req.tenantId && { tenantId: req.tenantId }) });
     await doc.save();
     res.status(201).json({ success: true, data: doc });
   } catch (err) {

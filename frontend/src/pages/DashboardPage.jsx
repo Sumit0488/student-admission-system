@@ -14,10 +14,18 @@ import {
   Wallet,
   CircleDollarSign,
   BarChart3,
+  BookOpen,
+  Home,
+  UserSquare2,
+  ShoppingCart,
 } from 'lucide-react';
 import { getStudents as apiGetStudents } from '../services/studentApi';
 import { getCertificates, getTemplates } from '../services/admissionsApi';
 import { getFeeOrders } from '../services/feeApi';
+import { getLibraryStats } from '../services/libraryApi';
+import { getHostelStats } from '../services/hostelApi';
+import { getAlumniStats } from '../services/alumniApi';
+import { getBillingStats } from '../services/billingApi';
 import StatusBadge from '../components/StatusBadge';
 
 export default function DashboardPage() {
@@ -28,6 +36,11 @@ export default function DashboardPage() {
   const [certLoading, setCertLoading] = useState(true);
   const [feeStats, setFeeStats] = useState({ totalAmount: 0, paidAmount: 0, dueAmount: 0, orderCount: 0 });
   const [feeLoading, setFeeLoading] = useState(true);
+  const [libraryStats, setLibraryStats] = useState({ total: 0, active: 0, fineCollected: 0 });
+  const [hostelStats, setHostelStats] = useState({ total: 0, active: 0, feeCollected: 0 });
+  const [alumniStats, setAlumniStats] = useState({ total: 0, active: 0 });
+  const [billingStats, setBillingStats] = useState({ total: 0, collected: 0, pending: 0 });
+  const [moduleStatsLoading, setModuleStatsLoading] = useState(true);
 
   useEffect(() => {
     console.log('[Dashboard] GET /api/students');
@@ -51,6 +64,17 @@ export default function DashboardPage() {
       })
       .catch(() => {})
       .finally(() => setFeeLoading(false));
+  }, []);
+
+  useEffect(() => {
+    Promise.allSettled([getLibraryStats(), getHostelStats(), getAlumniStats(), getBillingStats()])
+      .then(([libRes, hosRes, alumRes, billRes]) => {
+        if (libRes.status === 'fulfilled') setLibraryStats(libRes.value.data?.data || {});
+        if (hosRes.status === 'fulfilled') setHostelStats(hosRes.value.data?.data || {});
+        if (alumRes.status === 'fulfilled') setAlumniStats(alumRes.value.data?.data || {});
+        if (billRes.status === 'fulfilled') setBillingStats(billRes.value.data?.data || {});
+      })
+      .finally(() => setModuleStatsLoading(false));
   }, []);
 
   useEffect(() => {
@@ -233,6 +257,117 @@ export default function DashboardPage() {
               </p>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Module Stats — Library, Hostel, Alumni, Billing */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* Library */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50 dark:border-slate-700/50">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-emerald-600 flex items-center justify-center">
+                <BookOpen size={14} className="text-white" />
+              </div>
+              <span className="text-sm font-semibold text-gray-800 dark:text-white">Library</span>
+            </div>
+            <Link to="/admin/library/members" className="text-xs text-emerald-600 font-medium hover:underline">View →</Link>
+          </div>
+          <div className="divide-y divide-gray-50 dark:divide-slate-700/50">
+            {[
+              { label: 'Total Members', value: libraryStats.total },
+              { label: 'Active Members', value: libraryStats.active },
+              { label: 'Fine Collected', value: `₹${Number(libraryStats.fineCollected || 0).toLocaleString('en-IN')}` },
+            ].map(row => (
+              <div key={row.label} className="flex items-center justify-between px-4 py-2.5">
+                <span className="text-xs text-gray-500 dark:text-slate-400">{row.label}</span>
+                {moduleStatsLoading
+                  ? <span className="inline-block w-10 h-3.5 bg-gray-200 dark:bg-slate-700 rounded animate-pulse" />
+                  : <span className="text-sm font-semibold text-gray-900 dark:text-white">{row.value}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Hostel */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50 dark:border-slate-700/50">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center">
+                <Home size={14} className="text-white" />
+              </div>
+              <span className="text-sm font-semibold text-gray-800 dark:text-white">Hostel</span>
+            </div>
+            <Link to="/admin/hostel/members" className="text-xs text-blue-600 font-medium hover:underline">View →</Link>
+          </div>
+          <div className="divide-y divide-gray-50 dark:divide-slate-700/50">
+            {[
+              { label: 'Total Residents', value: hostelStats.total },
+              { label: 'Active Residents', value: hostelStats.active },
+              { label: 'Fee Collected', value: `₹${Number(hostelStats.feeCollected || 0).toLocaleString('en-IN')}` },
+            ].map(row => (
+              <div key={row.label} className="flex items-center justify-between px-4 py-2.5">
+                <span className="text-xs text-gray-500 dark:text-slate-400">{row.label}</span>
+                {moduleStatsLoading
+                  ? <span className="inline-block w-10 h-3.5 bg-gray-200 dark:bg-slate-700 rounded animate-pulse" />
+                  : <span className="text-sm font-semibold text-gray-900 dark:text-white">{row.value}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Alumni */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50 dark:border-slate-700/50">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-purple-600 flex items-center justify-center">
+                <UserSquare2 size={14} className="text-white" />
+              </div>
+              <span className="text-sm font-semibold text-gray-800 dark:text-white">Alumni</span>
+            </div>
+            <Link to="/admin/alumni/list" className="text-xs text-purple-600 font-medium hover:underline">View →</Link>
+          </div>
+          <div className="divide-y divide-gray-50 dark:divide-slate-700/50">
+            {[
+              { label: 'Total Alumni', value: alumniStats.total },
+              { label: 'Active', value: alumniStats.active },
+              { label: 'Inactive', value: (alumniStats.total || 0) - (alumniStats.active || 0) },
+            ].map(row => (
+              <div key={row.label} className="flex items-center justify-between px-4 py-2.5">
+                <span className="text-xs text-gray-500 dark:text-slate-400">{row.label}</span>
+                {moduleStatsLoading
+                  ? <span className="inline-block w-10 h-3.5 bg-gray-200 dark:bg-slate-700 rounded animate-pulse" />
+                  : <span className="text-sm font-semibold text-gray-900 dark:text-white">{row.value}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Billing */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50 dark:border-slate-700/50">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-orange-500 flex items-center justify-center">
+                <ShoppingCart size={14} className="text-white" />
+              </div>
+              <span className="text-sm font-semibold text-gray-800 dark:text-white">Billing</span>
+            </div>
+            <Link to="/admin/billing/orders" className="text-xs text-orange-600 font-medium hover:underline">View →</Link>
+          </div>
+          <div className="divide-y divide-gray-50 dark:divide-slate-700/50">
+            {[
+              { label: 'Total Orders', value: billingStats.total },
+              { label: 'Collected', value: `₹${Number(billingStats.collected || 0).toLocaleString('en-IN')}` },
+              { label: 'Pending Orders', value: billingStats.pending },
+            ].map(row => (
+              <div key={row.label} className="flex items-center justify-between px-4 py-2.5">
+                <span className="text-xs text-gray-500 dark:text-slate-400">{row.label}</span>
+                {moduleStatsLoading
+                  ? <span className="inline-block w-10 h-3.5 bg-gray-200 dark:bg-slate-700 rounded animate-pulse" />
+                  : <span className="text-sm font-semibold text-gray-900 dark:text-white">{row.value}</span>}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

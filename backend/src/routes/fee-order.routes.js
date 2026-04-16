@@ -1,10 +1,12 @@
 const express = require('express');
+const { getTenantFilter } = require('../utils/tenantFilter');
 const router = express.Router();
 const FeeOrder = require('../models/fee-order.model');
 
 router.get('/', async (req, res) => {
   try {
-    const filter = {};
+    const tf = getTenantFilter(req.tenantId);
+    const filter = { ...tf };
     if (req.query.status) filter.order_status = req.query.status;
     if (req.query.student_id) {
       try {
@@ -15,6 +17,12 @@ router.get('/', async (req, res) => {
     if (req.query.fee_category) filter.fee_category = req.query.fee_category;
     if (req.query.fee_schedule_id) {
       filter.fee_schedule_id = new (require('mongoose').Types.ObjectId)(req.query.fee_schedule_id);
+    }
+    if (req.query.module_name) filter.module_name = req.query.module_name;
+    if (req.query.usn) filter.usn = new RegExp(req.query.usn, 'i');
+    if (req.query.q) {
+      const re = new RegExp(req.query.q, 'i');
+      filter.$or = [{ student_name: re }, { usn: re }, { order_id: re }];
     }
 
     const page = parseInt(req.query.page) || 1;
@@ -43,7 +51,7 @@ router.get('/:id', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const doc = new FeeOrder(req.body);
+    const doc = new FeeOrder({ ...req.body, ...(req.tenantId && { tenantId: req.tenantId }) });
     await doc.save();
     res.status(201).json({ success: true, data: doc });
   } catch (err) {

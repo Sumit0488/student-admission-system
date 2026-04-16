@@ -9,9 +9,10 @@ const feeHeadSchema = new mongoose.Schema(
     fee_description: { type: String, trim: true, default: '' },
     fee_nature: { type: String, trim: true, default: '' },
     fee_head_status: { type: Boolean, default: true },
-    module_name: { type: String, enum: ['Fee', 'Billing', 'Exam', 'Library'], default: 'Fee' },
+    module_name: { type: String, enum: ['Fee', 'Billing', 'Exam', 'Library', 'Hostel', 'Alumni'], default: 'Fee' },
     app_type: { type: String, enum: ['Admin', 'Exam', 'Student'], default: 'Admin' },
-  },
+  tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', default: null, index: true },
+},
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 

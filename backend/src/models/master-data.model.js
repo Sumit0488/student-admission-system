@@ -7,6 +7,7 @@ const masterDataSchema = new mongoose.Schema({
   isActive:      { type: Boolean, default: true, index: true },
   isUserAddable: { type: Boolean, default: false },
   order:         { type: Number, default: 0 },
+  tenantId:      { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', default: null, index: true },
 }, { timestamps: true });
 
 // Compound index for fast lookups (NOT unique — existing duplicates in DB prevent unique index creation)

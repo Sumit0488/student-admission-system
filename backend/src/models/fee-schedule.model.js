@@ -38,10 +38,16 @@ const feeScheduleSchema = new mongoose.Schema(
       enum: ['offline', 'online', 'both', 'stop'],
       default: 'both',
     },
+    semester: { type: String, trim: true, default: '' },
+    min_amount: { type: Number, default: 0 },
+    payment_type: { type: String, enum: ['partial', 'full', 'both'], default: 'both' },
+    notify_sms: { type: Boolean, default: false },
+    notify_email: { type: Boolean, default: false },
     module_name: { type: String, trim: true, default: 'Fee' },
     app_type: { type: String, trim: true, default: 'Admin' },
     batch_name: { type: String, trim: true, default: '' },
-  },
+  tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', default: null, index: true },
+},
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 

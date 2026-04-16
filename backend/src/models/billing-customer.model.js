@@ -17,7 +17,8 @@ const billingCustomerSchema = new mongoose.Schema(
     program: { type: String, trim: true, default: '' },
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
     notes: { type: String, trim: true, default: '' },
-  },
+  tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', default: null, index: true },
+},
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 

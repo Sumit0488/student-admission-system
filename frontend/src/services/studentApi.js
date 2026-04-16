@@ -67,6 +67,9 @@ export const getStudentByUSN = async (usn) => {
 // POST /api/students/bulk-update  { studentIds, action, value }
 export const bulkUpdateStudents = (data) => api.post(`${API}/bulk-update`, data);
 
+// POST /api/students/bulk-promote  { studentIds, newTerm, newBatch?, newStatus? }
+export const bulkPromoteStudents = (data) => api.post(`${API}/bulk-promote`, data);
+
 // POST /api/students/bulk-export  { studentIds } → CSV blob
 export const bulkExportStudents = (data) =>
   api.post(`${API}/bulk-export`, data, { responseType: 'blob' });

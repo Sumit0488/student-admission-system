@@ -45,7 +45,9 @@
       "Bash(ls *)",
       "Bash(cmd //c \"cd C:\\\\\\\\Users\\\\\\\\nithi\\\\\\\\student-admission-system\\\\\\\\frontend && npm run build 2>&1\")",
       "Bash(npm --version)",
-      "Bash(du -sh /tmp/erp-feepay/ERP_FEEPAY-master/*)"
+      "Bash(du -sh /tmp/erp-feepay/ERP_FEEPAY-master/*)",
+      "Read(//c/Program Files/nodejs/**)",
+      "Read(//c/Program Files \\(x86\\)/**)"
     ]
   }
 }

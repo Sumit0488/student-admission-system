@@ -50,7 +50,8 @@ const billingOrderSchema = new mongoose.Schema(
       default: 'Admin',
     },
     customer_crm_id: { type: String, trim: true },
-  },
+  tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', default: null, index: true },
+},
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 

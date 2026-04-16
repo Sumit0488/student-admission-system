@@ -29,7 +29,8 @@ const scholarshipSchema = new mongoose.Schema(
       user_email: { type: String, trim: true },
       user_name: { type: String, trim: true },
     },
-  },
+  tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', default: null, index: true },
+},
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 

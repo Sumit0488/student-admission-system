@@ -1,4 +1,5 @@
 const express = require('express');
+const { getTenantFilter } = require('../utils/tenantFilter');
 const router = express.Router();
 const mongoose = require('mongoose');
 const FeeSchedule = require('../models/fee-schedule.model');
@@ -8,7 +9,8 @@ const Student = require('../models/student.model');
 
 router.get('/', async (req, res) => {
   try {
-    const filter = {};
+    const tf = getTenantFilter(req.tenantId);
+    const filter = { ...tf };
     if (req.query.academic_year) filter.academic_year = req.query.academic_year;
     if (req.query.stream_id) filter.stream_id = req.query.stream_id;
     if (req.query.fee_sched_status) filter.fee_sched_status = req.query.fee_sched_status;
@@ -116,7 +118,7 @@ router.get('/:id/stats', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const doc = new FeeSchedule(req.body);
+    const doc = new FeeSchedule({ ...req.body, ...(req.tenantId && { tenantId: req.tenantId }) });
     await doc.save();
     res.status(201).json({ success: true, data: doc });
   } catch (err) {

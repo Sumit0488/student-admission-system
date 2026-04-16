@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation, Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
+import { Crown, X } from 'lucide-react';
 
 const PAGE_TITLES = {
   '/admin/dashboard':                'Dashboard',
@@ -23,6 +24,19 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
+  // Impersonation banner state
+  const impersonating = (() => {
+    try { return JSON.parse(localStorage.getItem('impersonating')); } catch { return null; }
+  })();
+
+  const exitImpersonation = () => {
+    const orig = localStorage.getItem('auth_token_original');
+    if (orig) localStorage.setItem('auth_token', orig);
+    localStorage.removeItem('auth_token_original');
+    localStorage.removeItem('impersonating');
+    window.location.href = '/admin/super-admin';
+  };
+
   // Apply / remove 'dark' class on <html>
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
@@ -37,6 +51,18 @@ export default function Layout() {
 
       {/* Main column — offset by sidebar width on large screens */}
       <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
+        {/* Impersonation banner */}
+        {impersonating && (
+          <div className="flex items-center justify-between gap-3 px-5 py-2 bg-purple-600 text-white text-xs font-medium">
+            <span className="flex items-center gap-2">
+              <Crown size={13} />
+              Viewing as: <strong>{impersonating.name}</strong> — you are impersonating this institution
+            </span>
+            <button onClick={exitImpersonation} className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/20 hover:bg-white/30 transition-colors">
+              <X size={11} /> Exit
+            </button>
+          </div>
+        )}
         <Navbar
           darkMode={darkMode}
           setDarkMode={setDarkMode}

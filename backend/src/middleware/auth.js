@@ -1,6 +1,9 @@
 'use strict';
 const jwt = require('jsonwebtoken');
 
+if (!process.env.JWT_SECRET) {
+  console.warn('[AUTH] WARNING: JWT_SECRET not set in environment. Using insecure default. Set JWT_SECRET in .env before deploying.');
+}
 const JWT_SECRET = process.env.JWT_SECRET || 'admission_jwt_secret_change_in_prod';
 
 /**
@@ -48,8 +51,36 @@ const softAuth = (req, _res, next) => {
 };
 
 /**
+ * requireRole(...roles) — role guard factory.
+ * Usage:  router.delete('/...', requireAuth, requireRole('admin','superadmin'), handler)
+ * Must be used AFTER requireAuth so req.user is populated.
+ */
+const requireRole = (...roles) => (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, error: 'Authentication required' });
+  }
+  if (!roles.includes(req.user.role)) {
+    return res.status(403).json({
+      success: false,
+      error: `Access denied. Required role: ${roles.join(' or ')}`,
+    });
+  }
+  return next();
+};
+
+/**
+ * superAdminOnly — shorthand guard for superadmin-only routes.
+ */
+const superAdminOnly = requireRole('superadmin');
+
+/**
+ * adminOrAbove — admin or superadmin.
+ */
+const adminOrAbove = requireRole('admin', 'superadmin');
+
+/**
  * signToken — helper used in auth routes.
  */
 const signToken = (payload) => jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
 
-module.exports = { requireAuth, softAuth, signToken };
+module.exports = { requireAuth, softAuth, signToken, requireRole, superAdminOnly, adminOrAbove };

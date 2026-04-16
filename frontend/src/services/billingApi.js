@@ -7,6 +7,7 @@ export const updateBillingCustomer = (id, data) => api.put(`/api/billing/custome
 
 // Billing Orders
 export const getBillingOrders = (params) => api.get('/api/billing/orders', { params });
+export const getBillingStats = () => api.get('/api/billing/orders/stats');
 export const createBillingOrder = (data) => api.post('/api/billing/orders', data);
 export const updateBillingOrder = (id, data) => api.put(`/api/billing/orders/${id}`, data);
 

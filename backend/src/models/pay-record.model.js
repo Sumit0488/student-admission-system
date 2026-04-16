@@ -21,7 +21,8 @@ const payRecordSchema = new mongoose.Schema(
     module_name: { type: String, trim: true, default: 'Fee' },
     app_type: { type: String, trim: true, default: 'Admin' },
     transaction_id: { type: mongoose.Schema.Types.ObjectId, ref: 'FeeTransaction' },
-  },
+  tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', default: null, index: true },
+},
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 

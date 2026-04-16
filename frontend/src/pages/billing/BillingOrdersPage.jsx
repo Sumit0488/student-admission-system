@@ -5,6 +5,7 @@ import { useUrlFilters } from '../../hooks/useUrlFilters';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useToast } from '../../hooks/useToast';
 import Toasts from '../../components/Toasts';
+import { useFeeCategories } from '../../hooks/useFeeCategories';
 
 const STATUS_STYLE = {
   paid: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
@@ -18,10 +19,19 @@ const EMPTY_FORM = { customer_name: '', customer_id: '', entity: 'billing_order'
 
 const LIMIT = 20;
 
+const DEFAULT_BILLING_CATS = ['Service Charge', 'Product Fee', 'Registration Fee', 'Miscellaneous', 'Other'];
+
 function AddModal({ onClose, onSave }) {
+  const { categories: configCategories, loading: catLoading } = useFeeCategories('Billing', DEFAULT_BILLING_CATS);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  useEffect(() => {
+    if (!form.fee_category && configCategories.length > 0) {
+      setForm(f => ({ ...f, fee_category: configCategories[0] }));
+    }
+  }, [configCategories]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,6 +44,8 @@ function AddModal({ onClose, onSave }) {
     }
   };
 
+  const inp = 'w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md">
@@ -45,15 +57,36 @@ function AddModal({ onClose, onSave }) {
           {[
             { k: 'customer_name', l: 'Customer Name', req: true },
             { k: 'customer_id', l: 'Customer ID' },
-            { k: 'fee_category', l: 'Fee Category', req: true },
-            { k: 'fee_order_amount', l: 'Amount (₹)', type: 'number', req: true },
-          ].map(({ k, l, req, type }) => (
+          ].map(({ k, l, req }) => (
             <div key={k}>
               <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1">{l}{req ? ' *' : ''}</label>
-              <input required={req} type={type || 'text'} value={form[k]} onChange={(e) => set(k, e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              <input required={req} value={form[k]} onChange={(e) => set(k, e.target.value)} className={inp} />
             </div>
           ))}
+
+          {/* Fee Category — from Configuration */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1">
+              Fee Category * <span className="text-gray-400 font-normal">(from Fee Configuration)</span>
+            </label>
+            <select required value={form.fee_category} onChange={(e) => set('fee_category', e.target.value)} className={inp}>
+              {catLoading ? <option>Loading categories…</option> :
+                configCategories.length === 0
+                  ? <option value="">— No categories configured —</option>
+                  : configCategories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            {!catLoading && configCategories.length === 0 && (
+              <p className="text-xs text-orange-500 mt-1">
+                No Billing categories found. Go to Fee Management → Configuration → Fee Category and create categories for "Billing" module.
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1">Amount (₹) *</label>
+            <input required type="number" step="0.01" min="0" value={form.fee_order_amount} onChange={(e) => set('fee_order_amount', e.target.value)} className={inp} />
+          </div>
+
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 dark:border-slate-700">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors">Cancel</button>
             <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">{saving ? 'Saving...' : 'Create Order'}</button>

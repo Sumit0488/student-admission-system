@@ -186,4 +186,37 @@ router.post('/add-user', requireAuth, async (req, res) => {
   }
 });
 
+// ── GET /api/auth/institution ────────────────────────────────────────────────
+router.get('/institution', requireAuth, async (req, res) => {
+  try {
+    const tenant = req.user.tenantId ? await Tenant.findById(req.user.tenantId) : null;
+    if (!tenant) return res.status(404).json({ success: false, error: 'Institution not found' });
+    res.json({ success: true, data: tenant });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── PUT /api/auth/institution ─────────────────────────────────────────────────
+router.put('/institution', requireAuth, async (req, res) => {
+  try {
+    if (!req.user.tenantId)
+      return res.status(400).json({ success: false, error: 'No institution linked to this account' });
+    const allowed = ['name', 'domain', 'address', 'city', 'state', 'pin_code', 'phone', 'website'];
+    const update = {};
+    allowed.forEach((k) => { if (req.body[k] !== undefined) update[k] = req.body[k]; });
+    // Sync slug when name changes
+    if (update.name) update.slug = Tenant.generateCode(update.name);
+    const tenant = await Tenant.findByIdAndUpdate(
+      req.user.tenantId,
+      { $set: update },
+      { new: true, runValidators: false }
+    );
+    if (!tenant) return res.status(404).json({ success: false, error: 'Institution not found' });
+    res.json({ success: true, data: tenant });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

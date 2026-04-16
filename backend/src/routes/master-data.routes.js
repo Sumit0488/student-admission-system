@@ -1,8 +1,9 @@
+'use strict';
 const express    = require('express');
 const router     = express.Router();
 const MasterData = require('../models/master-data.model');
 
-// ── Default seed values — addable:true means admins can add more via UI ────────
+// ── Default seed values ────────────────────────────────────────────────────────
 const DEFAULTS = {
   // Static system fields — admin CANNOT add new values via UI
   gender:          { addable: false, labels: ['Male', 'Female', 'Other'] },
@@ -18,11 +19,21 @@ const DEFAULTS = {
   kannada:         { addable: false, labels: ['Balake Kannada', 'Samskrutika Kannada'] },
   admission_mode:  { addable: false, labels: ['Management', 'CET', 'COMEDK', 'NRI'] },
 
-  // User-addable fields — admin CAN add new values via UI
-  quota:           { addable: true,  labels: ['Management', 'CET', 'COMEDK', 'NRI', 'Government', 'Minority', 'SNQ'] },
-  exam:            { addable: true,  labels: ['KCET', 'COMEDK', 'JEE Main', 'JEE Advanced', 'NATA', 'Management', 'Other'] },
-  subject:         { addable: true,  labels: ['Physics', 'Chemistry', 'Mathematics', 'English', 'Computer Science', 'Electronics', 'Biology', 'Statistics'] },
-  stream:          { addable: true,  labels: [
+  // User-addable fields — admin CAN manage these via Academic Settings UI
+  program:         { addable: true, labels: [
+    'Computer Science and Engineering',
+    'Electronics and Communication',
+    'Mechanical Engineering',
+    'Civil Engineering',
+    'Artificial Intelligence & ML',
+    'Information Science',
+    'Electrical & Electronics',
+    'MBA', 'MCA', 'M.Tech',
+  ]},
+  batch:           { addable: true, labels: [
+    '2019-2023', '2020-2024', '2021-2025', '2022-2026', '2023-2027', '2024-2028',
+  ]},
+  stream:          { addable: true, labels: [
     'B.E Computer Science & Engineering',
     'B.E Electronics & Communication',
     'B.E Mechanical Engineering',
@@ -32,36 +43,31 @@ const DEFAULTS = {
     'B.E Electrical & Electronics',
     'MBA', 'MCA', 'M.Tech',
   ]},
-  academic_year:   { addable: true,  labels: ['2022-23', '2023-24', '2024-25', '2025-26', '2026-27'] },
-  program:         { addable: true,  labels: [
-    'Computer Science and Engineering',
-    'Electronics and Communication',
-    'Mechanical Engineering',
-    'Civil Engineering',
-    'Artificial Intelligence & ML',
-    'Information Science',
-    'Electrical & Electronics',
-  ]},
+  academic_year:   { addable: true, labels: ['2022-23', '2023-24', '2024-25', '2025-26', '2026-27'] },
+  admission_status: { addable: true, labels: ['Live', 'Completed', 'Cancelled', 'Detained', 'Pass Out'] },
+  quota:           { addable: true, labels: ['Management', 'CET', 'COMEDK', 'NRI', 'Government', 'Minority', 'SNQ'] },
+  exam:            { addable: true, labels: ['KCET', 'COMEDK', 'JEE Main', 'JEE Advanced', 'NATA', 'Management', 'Other'] },
+  subject:         { addable: true, labels: ['Physics', 'Chemistry', 'Mathematics', 'English', 'Computer Science', 'Electronics', 'Biology', 'Statistics'] },
 };
 
+// ── Helper: get tenant filter ─────────────────────────────────────────────────
+const getTenantFilter = (tenantId) =>
+  tenantId ? { tenantId: { $in: [tenantId, null] } } : { tenantId: null };
+
 // ── Seed all defaults ─────────────────────────────────────────────────────────
-// Builds the full list of required docs, fetches existing labels in ONE query,
-// then inserts only the missing ones in ONE bulk write. Fast even on Atlas.
-async function seedDefaults() {
-  // Build the complete desired set
+async function seedDefaults(tenantId = null) {
   const desired = [];
   for (const [type, { addable, labels }] of Object.entries(DEFAULTS)) {
     labels.forEach((label, i) => {
       const value = label.toLowerCase().replace(/[^a-z0-9]/g, '_');
-      desired.push({ type, label, value, isUserAddable: addable, order: i, isActive: true });
+      desired.push({ type, label, value, isUserAddable: addable, order: i, isActive: true, tenantId: null });
     });
   }
 
-  // Fetch all existing type+label pairs in a SINGLE query
-  const existing = await MasterData.find({}, { type: 1, label: 1 }).lean();
+  // Fetch all existing global (tenantId=null) type+label pairs
+  const existing = await MasterData.find({ tenantId: null }, { type: 1, label: 1 }).lean();
   const existingKeys = new Set(existing.map((d) => `${d.type}::${d.label}`));
 
-  // Insert only the missing ones (skip duplicates silently)
   const toInsert = desired.filter((d) => !existingKeys.has(`${d.type}::${d.label}`));
   if (toInsert.length > 0) {
     await MasterData.insertMany(toInsert, { ordered: false }).catch(() => {});
@@ -92,7 +98,8 @@ router.get('/types', async (_req, res) => {
 // GET /api/master-data?type=gender
 router.get('/', async (req, res) => {
   try {
-    const filter = { isActive: true };
+    const tenantFilter = getTenantFilter(req.tenantId);
+    const filter = { isActive: true, ...tenantFilter };
     if (req.query.type) filter.type = req.query.type;
     const data = await MasterData.find(filter).sort({ order: 1, label: 1 });
     res.json({ success: true, data });
@@ -115,7 +122,8 @@ router.post('/', async (req, res) => {
       return res.status(403).json({ success: false, error: `Cannot add new values to "${type}"` });
     }
 
-    const existing = await MasterData.findOne({ type, label: label.trim() });
+    const tenantId = req.tenantId || null;
+    const existing = await MasterData.findOne({ type, label: label.trim(), tenantId });
     if (existing) {
       if (!existing.isActive) {
         existing.isActive = true;
@@ -124,11 +132,11 @@ router.post('/', async (req, res) => {
       }
       return res.status(400).json({ success: false, error: 'Value already exists' });
     }
-    const maxOrder = await MasterData.findOne({ type }).sort({ order: -1 });
+    const maxOrder = await MasterData.findOne({ type, tenantId: { $in: [tenantId, null] } }).sort({ order: -1 });
     const order = maxOrder ? maxOrder.order + 1 : 0;
     const value = label.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
     const isUserAddable = typeMeta ? typeMeta.addable : true;
-    const item = await MasterData.create({ type, label: label.trim(), value, order, isUserAddable });
+    const item = await MasterData.create({ type, label: label.trim(), value, order, isUserAddable, tenantId });
     res.status(201).json({ success: true, data: item });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -138,7 +146,16 @@ router.post('/', async (req, res) => {
 // PUT /api/master-data/:id
 router.put('/:id', async (req, res) => {
   try {
-    const item = await MasterData.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const { label } = req.body;
+    const update = {};
+    if (label !== undefined) {
+      update.label = label.trim();
+      update.value = label.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+    }
+    if (req.body.order !== undefined) update.order = req.body.order;
+    if (req.body.isActive !== undefined) update.isActive = req.body.isActive;
+
+    const item = await MasterData.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
     if (!item) return res.status(404).json({ success: false, error: 'Not found' });
     res.json({ success: true, data: item });
   } catch (err) {
@@ -149,6 +166,9 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/master-data/:id (soft delete)
 router.delete('/:id', async (req, res) => {
   try {
+    const item = await MasterData.findById(req.params.id);
+    if (!item) return res.status(404).json({ success: false, error: 'Not found' });
+    if (!item.isUserAddable) return res.status(403).json({ success: false, error: 'System items cannot be deleted' });
     await MasterData.findByIdAndUpdate(req.params.id, { isActive: false });
     res.json({ success: true });
   } catch (err) {

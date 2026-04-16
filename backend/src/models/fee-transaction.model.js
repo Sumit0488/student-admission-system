@@ -38,7 +38,8 @@ const feeTransactionSchema = new mongoose.Schema(
     user_email: { type: String, trim: true },
     module_name: { type: String, trim: true, default: 'Fee' },
     app_type: { type: String, trim: true, default: 'Admin' },
-  },
+  tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', default: null, index: true },
+},
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 

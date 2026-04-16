@@ -11,6 +11,7 @@ const certRequestRoutes = require('./routes/certificate-request.routes');
 const masterDataRoutes = require('./routes/master-data.routes');
 const eligibilityRoutes = require('./routes/eligibility.routes');
 const authRoutes = require('./routes/auth.routes');
+const accountRoutes = require('./routes/account.routes');
 // Fee Management routes
 const feeHeadRoutes = require('./routes/fee-head.routes');
 const feeCategoryRoutes = require('./routes/fee-category.routes');
@@ -29,8 +30,27 @@ const billingCustomerRoutes = require('./routes/billing-customer.routes');
 const billingOrderRoutes = require('./routes/billing-order.routes');
 const billingTransactionRoutes = require('./routes/billing-transaction.routes');
 const billingPayRecordRoutes = require('./routes/billing-pay-record.routes');
-const { softAuth } = require('./middleware/auth');
+// Hostel routes
+const hostelStudentRoutes = require('./routes/hostel-student.routes');
+const hostelAssetRoutes = require('./routes/hostel-asset.routes');
+const hostelEventRoutes = require('./routes/hostel-event.routes');
+const hostelTimesheetRoutes = require('./routes/hostel-timesheet.routes');
+const hostelDeviceRoutes = require('./routes/hostel-device.routes');
+// Library routes
+const libraryMemberRoutes = require('./routes/library-member.routes');
+// Alumni routes
+const alumniRoutes = require('./routes/alumni.routes');
+// Activity Logs
+const activityLogRoutes = require('./routes/activity-log.routes');
+// Academic Setting routes
+const streamRoutes = require('./routes/stream.routes');
+const academicProgramRoutes = require('./routes/academic-program.routes');
+// Settings route
+const settingsRoutes = require('./routes/settings.routes');
+const { softAuth, requireAuth } = require('./middleware/auth');
 const { globalErrorHandler } = require('./utils/errorHandler');
+const superAdminRoutes = require('./routes/super-admin.routes');
+const userManagementRoutes = require('./routes/user-management.routes');
 
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
@@ -84,6 +104,8 @@ app.use(softAuth);
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
+app.use('/api/super-admin', requireAuth, superAdminRoutes);
+app.use('/api/users', requireAuth, userManagementRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/enquiry', enquiryRoutes);
@@ -93,6 +115,8 @@ app.use('/api/certificates', certRoutes);
 app.use('/api/certificate-requests', certRequestRoutes);
 app.use('/api/master-data', masterDataRoutes);
 app.use('/api/eligibility', eligibilityRoutes);
+// Accounts
+app.use('/api/accounts', accountRoutes);
 // Fee Management
 app.use('/api/fee/heads', feeHeadRoutes);
 app.use('/api/fee/categories', feeCategoryRoutes);
@@ -111,6 +135,22 @@ app.use('/api/billing/customers', billingCustomerRoutes);
 app.use('/api/billing/orders', billingOrderRoutes);
 app.use('/api/billing/transactions', billingTransactionRoutes);
 app.use('/api/billing/pay-records', billingPayRecordRoutes);
+// Hostel
+app.use('/api/hostel/students', hostelStudentRoutes);
+app.use('/api/hostel/assets', hostelAssetRoutes);
+app.use('/api/hostel/events', hostelEventRoutes);
+app.use('/api/hostel/timesheet', hostelTimesheetRoutes);
+app.use('/api/hostel/devices', hostelDeviceRoutes);
+// Library
+app.use('/api/library/members', libraryMemberRoutes);
+// Alumni
+app.use('/api/alumni', alumniRoutes);
+// Activity Logs
+app.use('/api/activity-logs', activityLogRoutes);
+// Academic Setting
+app.use('/api/academic/streams', streamRoutes);
+app.use('/api/academic/programs', academicProgramRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));

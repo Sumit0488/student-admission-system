@@ -153,6 +153,45 @@ router.post('/bulk-update', async (req, res) => {
   }
 });
 
+// ─── POST /api/students/bulk-promote ─────────────────────────────────────────
+// Body: { studentIds: string[], newTerm: number, newBatch?: string, newStatus?: string }
+router.post('/bulk-promote', async (req, res) => {
+  try {
+    const { studentIds, newTerm, newBatch, newStatus } = req.body;
+    if (!Array.isArray(studentIds) || studentIds.length === 0)
+      return res.status(400).json({ success: false, error: 'studentIds must be a non-empty array' });
+    if (newTerm == null || isNaN(parseInt(newTerm)))
+      return res.status(400).json({ success: false, error: 'newTerm must be a number' });
+
+    const validIds = studentIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+    if (validIds.length === 0)
+      return res.status(400).json({ success: false, error: 'No valid student IDs provided' });
+
+    const update = { $set: { term: parseInt(newTerm) } };
+    if (newBatch) update.$set.batch = newBatch;
+    if (newStatus) update.$set.admissionStatus = newStatus;
+
+    const result = await Student.updateMany(
+      { _id: { $in: validIds }, isDeleted: { $ne: true } },
+      update
+    );
+
+    const performedBy = req.user?.email || req.headers['x-user'] || 'admin';
+    const auditDocs = validIds.map((sid) => ({
+      studentId: sid,
+      actionType: 'PROMOTED',
+      performedBy,
+      metadata: { newTerm, newBatch, newStatus, bulk: true },
+      ...(req.tenantId && { tenantId: req.tenantId }),
+    }));
+    await AuditLog.insertMany(auditDocs);
+
+    res.json({ success: true, updated: result.modifiedCount });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ─── POST /api/students/bulk-export ──────────────────────────────────────────
 // Body: { studentIds: string[] }
 // Returns CSV text with headers: USN,Name,Email,Program,Batch,Status,Quota

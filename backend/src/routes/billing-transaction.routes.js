@@ -1,10 +1,12 @@
 const express = require('express');
+const { getTenantFilter } = require('../utils/tenantFilter');
 const router = express.Router();
 const BillingTransaction = require('../models/billing-transaction.model');
 
 router.get('/', async (req, res) => {
   try {
-    const filter = {};
+    const tf = getTenantFilter(req.tenantId);
+    const filter = { ...tf };
     if (req.query.pay_status) filter.pay_status = req.query.pay_status;
     if (req.query.customer_id) filter.customer_id = req.query.customer_id;
 
@@ -24,7 +26,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const doc = new BillingTransaction(req.body);
+    const doc = new BillingTransaction({ ...req.body, ...(req.tenantId && { tenantId: req.tenantId }) });
     await doc.save();
     res.status(201).json({ success: true, data: doc });
   } catch (err) {

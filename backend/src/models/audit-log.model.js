@@ -27,6 +27,7 @@ const auditLogSchema = new mongoose.Schema(
         'CREATED',
         'UPDATED',
         'STATUS_CHANGED',
+        'PROMOTED',
         'CERTIFICATE_ISSUED',
         'CERTIFICATE_APPROVED',
         'CERTIFICATE_REJECTED',

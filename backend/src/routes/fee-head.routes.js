@@ -1,10 +1,12 @@
 const express = require('express');
+const { getTenantFilter } = require('../utils/tenantFilter');
 const router = express.Router();
 const FeeHead = require('../models/fee-head.model');
 
 router.get('/', async (req, res) => {
   try {
-    const filter = {};
+    const tf = getTenantFilter(req.tenantId);
+    const filter = { ...tf };
     if (req.query.fee_category) filter.fee_category = req.query.fee_category;
     if (req.query.module_name) filter.module_name = req.query.module_name;
     const data = await FeeHead.find(filter).sort({ created_at: -1 });
@@ -16,7 +18,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const doc = new FeeHead(req.body);
+    const doc = new FeeHead({ ...req.body, ...(req.tenantId && { tenantId: req.tenantId }) });
     await doc.save();
     res.status(201).json({ success: true, data: doc });
   } catch (err) {

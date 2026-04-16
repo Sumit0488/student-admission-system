@@ -19,7 +19,8 @@ const feeStructureSchema = new mongoose.Schema(
     fee_total_amount: { type: Number, required: true, default: 0 },
     admission_type: { type: String, trim: true, default: '' },
     module_name: { type: String, trim: true, default: 'Fee' },
-  },
+  tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', default: null, index: true },
+},
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 

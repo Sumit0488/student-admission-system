@@ -41,7 +41,14 @@ const tenantSchema = new mongoose.Schema(
       lowercase: true,
     },
     domain: { type: String, trim: true, default: '' },
+    address: { type: String, trim: true, default: '' },
+    city: { type: String, trim: true, default: '' },
+    state: { type: String, trim: true, default: '' },
+    pin_code: { type: String, trim: true, default: '' },
+    phone: { type: String, trim: true, default: '' },
+    website: { type: String, trim: true, default: '' },
     isActive: { type: Boolean, default: true },
+    extra: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
 );

@@ -1,12 +1,23 @@
 import { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, Users, CheckCircle, Award,
   FileText, BarChart2, ScrollText, TrendingUp, CreditCard,
   Wallet, Banknote, ArrowLeftRight, ChevronDown,
   GraduationCap, X, Search, Receipt, PiggyBank, Settings,
-  ShoppingCart, UserCheck, Building2, ChevronRight,
+  ShoppingCart, UserCheck, Building2,
+  BookOpen, Home, UserSquare2, Package, CalendarDays, Clock, Cpu,
+  Crown, LogOut,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+
+// ─── Super admin section (injected at top for superadmin role) ───────────────
+const SUPER_ADMIN_SECTION = {
+  section: 'Super Admin',
+  items: [
+    { label: 'All Institutions', icon: Crown, to: '/admin/super-admin' },
+  ],
+};
 
 // ─── Nav structure ────────────────────────────────────────────────────────────
 const NAV = [
@@ -84,6 +95,56 @@ const NAV = [
           { label: 'Pay Records',  icon: Receipt,       to: '/admin/billing/pay-records'  },
           { label: 'Reports',      icon: BarChart2,     to: '/admin/billing/reports'      },
           { label: 'Logs',         icon: ScrollText,    to: '/admin/billing/logs'         },
+        ],
+      },
+    ],
+  },
+  {
+    section: 'Library',
+    items: [
+      {
+        label: 'Library',
+        icon: BookOpen,
+        prefix: '/admin/library',
+        children: [
+          { label: 'Members',      icon: Users,          to: '/admin/library/members'      },
+          { label: 'Transactions', icon: ArrowLeftRight,  to: '/admin/library/transactions' },
+          { label: 'Fine Report',  icon: TrendingUp,      to: '/admin/library/fine-report'  },
+          { label: 'Reports',      icon: BarChart2,       to: '/admin/library/reports'      },
+          { label: 'Logs',         icon: ScrollText,      to: '/admin/library/logs'         },
+        ],
+      },
+    ],
+  },
+  {
+    section: 'Hostel',
+    items: [
+      {
+        label: 'Hostel',
+        icon: Home,
+        prefix: '/admin/hostel',
+        children: [
+          { label: 'Members',      icon: Users,          to: '/admin/hostel/students'      },
+          { label: 'Assets',       icon: Package,        to: '/admin/hostel/assets'        },
+          { label: 'Events',       icon: CalendarDays,   to: '/admin/hostel/events'        },
+          { label: 'Timesheet',    icon: Clock,          to: '/admin/hostel/timesheet'     },
+          { label: 'Devices',      icon: Cpu,            to: '/admin/hostel/devices'       },
+          { label: 'Transactions', icon: ArrowLeftRight,  to: '/admin/hostel/transactions'  },
+          { label: 'Reports',      icon: BarChart2,       to: '/admin/hostel/reports'       },
+        ],
+      },
+    ],
+  },
+  {
+    section: 'Alumni',
+    items: [
+      {
+        label: 'Alumni',
+        icon: UserSquare2,
+        prefix: '/admin/alumni',
+        children: [
+          { label: 'Directory',    icon: GraduationCap, to: '/admin/alumni/list'     },
+          { label: 'Reports',      icon: BarChart2,     to: '/admin/alumni/reports'  },
         ],
       },
     ],
@@ -174,6 +235,11 @@ function ParentItem({ item, onClose }) {
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 export default function Sidebar({ open, onClose }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const role = user?.role || 'staff';
+
+  const visibleNav = role === 'superadmin' ? [SUPER_ADMIN_SECTION, ...NAV] : NAV;
 
   const isActive = (to) =>
     location.pathname === to || location.pathname.startsWith(to + '/');
@@ -207,7 +273,7 @@ export default function Sidebar({ open, onClose }) {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6 sidebar-scroll">
-          {NAV.map((section) => (
+          {visibleNav.map((section) => (
             <div key={section.section}>
               <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
                 {section.section}
@@ -241,13 +307,16 @@ export default function Sidebar({ open, onClose }) {
         {/* Bottom user info */}
         <div className="px-4 py-4 border-t border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-              AD
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${role === 'superadmin' ? 'bg-purple-600' : 'bg-blue-600'}`}>
+              {user?.name?.[0]?.toUpperCase() || 'U'}
             </div>
-            <div className="min-w-0">
-              <p className="text-white text-xs font-medium truncate">Admin User</p>
-              <p className="text-slate-500 text-[10px] truncate">admin@college.edu</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-white text-xs font-medium truncate">{user?.name || 'User'}</p>
+              <p className="text-slate-500 text-[10px] truncate capitalize">{role}</p>
             </div>
+            <button onClick={() => { logout(); navigate('/login', { replace: true }); }} className="text-slate-500 hover:text-red-400 transition-colors flex-shrink-0" title="Logout">
+              <LogOut size={14} />
+            </button>
           </div>
         </div>
       </aside>

@@ -1,12 +1,15 @@
 const express = require('express');
+const { getTenantFilter } = require('../utils/tenantFilter');
 const router = express.Router();
 const FeeCategory = require('../models/fee-category.model');
 
 router.get('/', async (req, res) => {
   try {
-    const filter = {};
+    const tf = getTenantFilter(req.tenantId);
+    const filter = { ...tf };
     if (req.query.status) filter.status = req.query.status;
     if (req.query.module_name) filter.module_name = req.query.module_name;
+    if (req.query.account_type) filter.account_type = req.query.account_type;
     const data = await FeeCategory.find(filter).sort({ created_at: -1 });
     res.json({ success: true, data });
   } catch (err) {
@@ -16,7 +19,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const doc = new FeeCategory(req.body);
+    const doc = new FeeCategory({ ...req.body, ...(req.tenantId && { tenantId: req.tenantId }) });
     await doc.save();
     res.status(201).json({ success: true, data: doc });
   } catch (err) {

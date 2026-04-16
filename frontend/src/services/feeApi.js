@@ -1,5 +1,11 @@
 import api from './api';
 
+// Accounts
+export const getAccounts = () => api.get('/api/accounts');
+export const createAccount = (data) => api.post('/api/accounts', data);
+export const updateAccount = (id, data) => api.put(`/api/accounts/${id}`, data);
+export const deleteAccount = (id) => api.delete(`/api/accounts/${id}`);
+
 // Fee Heads
 export const getFeeHeads = (params) => api.get('/api/fee/heads', { params });
 export const createFeeHead = (data) => api.post('/api/fee/heads', data);
