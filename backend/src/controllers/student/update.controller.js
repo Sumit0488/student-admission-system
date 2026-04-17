@@ -1,5 +1,6 @@
 const studentService = require('../../services/student.service');
 const AuditLog = require('../../models/audit-log.model');
+const logActivity = require('../../utils/logActivity');
 const handleError = require('./handleError');
 
 // ─── UPDATE  PUT /api/students/:id ────────────────────────────────────────────
@@ -21,6 +22,13 @@ const updateStudent = async (req, res) => {
       metadata: { fields: Object.keys(req.body) },
       ...(req.tenantId && { tenantId: req.tenantId }),
     }).catch(() => {});
+    logActivity({
+      module: 'Admissions', action: 'student_updated', label: 'Student Updated',
+      entityId: data.student_id || String(data._id), entityLabel: data.name,
+      studentName: data.name, usn: data.usn,
+      details: `Student ${data.name} updated`,
+      req,
+    });
 
     return res.json({ success: true, action: 'UPDATE', data });
   } catch (err) {
@@ -46,6 +54,13 @@ const changeStatus = async (req, res) => {
       metadata: { newStatus: req.body.status },
       ...(req.tenantId && { tenantId: req.tenantId }),
     }).catch(() => {});
+    logActivity({
+      module: 'Admissions', action: 'student_status_changed', label: 'Student Status Changed',
+      entityId: data.student_id || String(data._id), entityLabel: data.name,
+      studentName: data.name, usn: data.usn,
+      details: `${data.name} status → ${data.status}`,
+      req,
+    });
 
     return res.json({ success: true, action: 'CHANGE_STATUS', data });
   } catch (err) {

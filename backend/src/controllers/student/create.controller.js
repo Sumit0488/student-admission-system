@@ -1,5 +1,6 @@
 const studentService = require('../../services/student.service');
 const AuditLog = require('../../models/audit-log.model');
+const logActivity = require('../../utils/logActivity');
 const handleError = require('./handleError');
 
 // ─── CREATE  POST /api/students ───────────────────────────────────────────────
@@ -21,6 +22,13 @@ const createStudent = async (req, res) => {
       metadata: { name: data.name, program: data.program, batch: data.batch },
       ...(req.tenantId && { tenantId: req.tenantId }),
     }).catch(() => {});
+    logActivity({
+      module: 'Admissions', action: 'student_created', label: 'Student Created',
+      entityId: data.student_id || String(data._id || data.id), entityLabel: data.name,
+      studentName: data.name, usn: data.usn,
+      details: `${data.name} enrolled in ${data.program || ''} ${data.batch || ''}`.trim(),
+      req,
+    });
 
     return res.status(201).json({ success: true, action: 'CREATE', data });
   } catch (err) {

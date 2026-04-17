@@ -4,8 +4,13 @@ const router = express.Router();
 const HostelTimesheet = require('../models/hostel-timesheet.model');
 const ActivityLog = require('../models/activity-log.model');
 
-const log = (action, label, data) =>
-  ActivityLog.create({ module: 'Hostel', action, action_label: label, ...data }).catch(() => {});
+const log = (action, label, data, req) =>
+  ActivityLog.create({
+    module: 'Hostel', action, action_label: label,
+    performed_by: req?.user?.name || req?.user?.email || 'Admin',
+    ip: req?.ip, tenantId: req?.tenantId || null,
+    ...data,
+  }).catch(() => {});
 
 router.get('/', async (req, res) => {
   try {
@@ -43,7 +48,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const rec = await HostelTimesheet.create(req.body);
-    log('timesheet_recorded', 'Timesheet Recorded', { entity_id: rec.record_id, entity_label: rec.student_name, student_name: rec.student_name, usn: rec.usn, details: `${rec.status} on ${new Date(rec.date).toLocaleDateString()}` });
+    log('timesheet_recorded', 'Timesheet Recorded', { entity_id: rec.record_id, entity_label: rec.student_name, student_name: rec.student_name, usn: rec.usn, details: `${rec.status} on ${new Date(rec.date).toLocaleDateString()}` }, req);
     res.status(201).json(rec);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });

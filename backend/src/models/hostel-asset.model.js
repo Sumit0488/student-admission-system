@@ -21,12 +21,11 @@ const hostelAssetSchema = new mongoose.Schema({
   tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', default: null, index: true },
 }, { timestamps: true });
 
-hostelAssetSchema.pre('save', async function (next) {
+hostelAssetSchema.pre('save', async function () {
   if (!this.issue_id) {
     const count = await mongoose.model('HostelAsset').countDocuments();
     this.issue_id = `AST-${String(count + 1).padStart(4, '0')}`;
   }
-  next();
 });
 
 module.exports = mongoose.model('HostelAsset', hostelAssetSchema);

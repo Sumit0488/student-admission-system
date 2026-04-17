@@ -132,6 +132,7 @@ export default function Navbar({ darkMode, setDarkMode, onMenuClick }) {
         {/* Settings */}
         <button
           type="button"
+          onClick={() => navigate('/admin/config/users')}
           className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
           title="Settings"
         >

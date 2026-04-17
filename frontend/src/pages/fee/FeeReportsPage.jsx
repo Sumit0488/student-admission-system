@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { ChevronRight, BarChart2, ChevronLeft, RefreshCw, Download, FileText } from 'lucide-react';
 import { generatePDF, inr, fmtD } from '../../utils/pdfReport';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const FEE_CATEGORIES = [
@@ -429,6 +430,7 @@ function fmtDate(iso) {
 // ── Report detail page ────────────────────────────────────────────────────────
 function ReportDetailPage({ reportKey, onBack }) {
   const cfg = REPORT_CONFIGS[reportKey];
+  const { tenant } = useAuth();
 
   const initFilters = () => {
     const f = {};
@@ -475,6 +477,7 @@ function ReportDetailPage({ reportKey, onBack }) {
       columns: cfg.pdfColumns,
       rows: pdfRows,
       filename: `${cfg.name.replace(/\s+/g, '_')}_${Date.now()}`,
+      institution: tenant?.name,
     });
   };
 

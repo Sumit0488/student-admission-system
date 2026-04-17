@@ -18,12 +18,11 @@ const hostelEventSchema = new mongoose.Schema({
   tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', default: null, index: true },
 }, { timestamps: true });
 
-hostelEventSchema.pre('save', async function (next) {
+hostelEventSchema.pre('save', async function () {
   if (!this.event_id) {
     const count = await mongoose.model('HostelEvent').countDocuments();
     this.event_id = `EVT-${String(count + 1).padStart(4, '0')}`;
   }
-  next();
 });
 
 module.exports = mongoose.model('HostelEvent', hostelEventSchema);

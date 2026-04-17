@@ -13,6 +13,9 @@ import ApprovalsPage from './pages/admissions/ApprovalsPage';
 import CertificatesPage from './pages/admissions/CertificatesPage';
 import TemplateEditorPage from './pages/admissions/TemplateEditorPage';
 import CertificateRequestPage from './pages/student/CertificateRequestPage';
+import FormsPage from './pages/admissions/FormsPage';
+import AdmissionsReportsPage from './pages/admissions/AdmissionsReportsPage';
+import AdmissionsLogsPage from './pages/admissions/AdmissionsLogsPage';
 
 // Fee Management pages
 import FeeTrackerPage from './pages/fee/FeeTrackerPage';
@@ -49,6 +52,7 @@ import BillingTransactionsPage from './pages/billing/BillingTransactionsPage';
 import BillingPayRecordsPage from './pages/billing/BillingPayRecordsPage';
 import BillingReportsPage from './pages/billing/BillingReportsPage';
 import BillingLogsPage from './pages/billing/BillingLogsPage';
+import CreateOrderPage from './pages/billing/CreateOrderPage';
 
 // Library pages
 import LibraryStudentsPage from './pages/library/LibraryStudentsPage';
@@ -65,10 +69,12 @@ import HostelTimesheetPage from './pages/hostel/HostelTimesheetPage';
 import HostelDevicePage from './pages/hostel/HostelDevicePage';
 import HostelTransactionsPage from './pages/hostel/HostelTransactionsPage';
 import HostelReportsPage from './pages/hostel/HostelReportsPage';
+import HostelLogsPage from './pages/hostel/HostelLogsPage';
 
 // Alumni pages
 import AlumniListPage from './pages/alumni/AlumniListPage';
 import AlumniReportsPage from './pages/alumni/AlumniReportsPage';
+import AlumniLogsPage from './pages/alumni/AlumniLogsPage';
 
 // Main menu pages
 import ReportsPage from './pages/ReportsPage';
@@ -115,8 +121,10 @@ export default function App() {
         <Route path="/admin/certificates/templates/:id" element={<TemplateEditorPage />} />
         {/* Other sidebar pages */}
         <Route path="/admin/finance" element={<Placeholder name="Finance" />} />
-        <Route path="/admin/forms" element={<Placeholder name="Forms" />} />
+        <Route path="/admin/forms" element={<FormsPage />} />
         <Route path="/admin/reports" element={<ReportsPage />} />
+        <Route path="/admin/admissions/reports" element={<AdmissionsReportsPage />} />
+        <Route path="/admin/admissions/logs" element={<AdmissionsLogsPage />} />
         <Route path="/admin/logs" element={<LogsPage />} />
         <Route path="/admin/promote" element={<PromoteStudentsPage />} />
 
@@ -152,6 +160,7 @@ export default function App() {
         <Route path="/admin/general/logs" element={<GeneralLogsPage />} />
 
         {/* ── Billing ──────────────────────────────────────────────────────── */}
+        <Route path="/admin/billing/create-order" element={<CreateOrderPage />} />
         <Route path="/admin/billing/customers" element={<BillingCustomersPage />} />
         <Route path="/admin/billing/orders" element={<BillingOrdersPage />} />
         <Route path="/admin/billing/transactions" element={<BillingTransactionsPage />} />
@@ -174,6 +183,7 @@ export default function App() {
         <Route path="/admin/hostel/devices" element={<HostelDevicePage />} />
         <Route path="/admin/hostel/transactions" element={<HostelTransactionsPage />} />
         <Route path="/admin/hostel/reports" element={<HostelReportsPage />} />
+        <Route path="/admin/hostel/logs" element={<HostelLogsPage />} />
 
         {/* ── Super Admin ──────────────────────────────────────────────────── */}
         <Route path="/admin/super-admin" element={<SuperAdminPage />} />
@@ -181,6 +191,7 @@ export default function App() {
         {/* ── Alumni ───────────────────────────────────────────────────────── */}
         <Route path="/admin/alumni/list" element={<AlumniListPage />} />
         <Route path="/admin/alumni/reports" element={<AlumniReportsPage />} />
+        <Route path="/admin/alumni/logs" element={<AlumniLogsPage />} />
 
         {/* ── Admissions sub-section: sidebar + tab strip ──────────────────── */}
         <Route element={<AdmissionsLayout />}>

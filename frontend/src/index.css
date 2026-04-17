@@ -5,6 +5,32 @@
 @layer base {
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
+    font-weight: 400;
+    color: #111827;
+  }
+
+  /* Ensure strong readable text throughout */
+  p, span, td, th, label, input, select, textarea, button {
+    color: inherit;
+  }
+
+  /* Table headers always bold and dark */
+  th {
+    font-weight: 600 !important;
+    color: #374151 !important;
+  }
+
+  .dark th {
+    color: #94a3b8 !important;
+  }
+
+  /* Table cell text */
+  td {
+    color: #1f2937;
+  }
+
+  .dark td {
+    color: #e2e8f0;
   }
 }
 

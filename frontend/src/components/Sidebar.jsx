@@ -37,6 +37,8 @@ const NAV = [
           { label: 'Approvals', icon: CheckCircle,   to: '/admin/admissions/approvals' },
           { label: 'Certificates', icon: Award,      to: '/admin/certificates'         },
           { label: 'Forms',     icon: FileText,      to: '/admin/forms'                },
+          { label: 'Reports',   icon: BarChart2,     to: '/admin/admissions/reports'   },
+          { label: 'Logs',      icon: ScrollText,    to: '/admin/admissions/logs'      },
         ],
       },
 
@@ -131,6 +133,7 @@ const NAV = [
           { label: 'Devices',      icon: Cpu,            to: '/admin/hostel/devices'       },
           { label: 'Transactions', icon: ArrowLeftRight,  to: '/admin/hostel/transactions'  },
           { label: 'Reports',      icon: BarChart2,       to: '/admin/hostel/reports'       },
+          { label: 'Logs',         icon: ScrollText,      to: '/admin/hostel/logs'          },
         ],
       },
     ],
@@ -145,6 +148,7 @@ const NAV = [
         children: [
           { label: 'Directory',    icon: GraduationCap, to: '/admin/alumni/list'     },
           { label: 'Reports',      icon: BarChart2,     to: '/admin/alumni/reports'  },
+          { label: 'Logs',         icon: ScrollText,    to: '/admin/alumni/logs'     },
         ],
       },
     ],

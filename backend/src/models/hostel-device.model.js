@@ -20,12 +20,11 @@ const hostelDeviceSchema = new mongoose.Schema({
   tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', default: null, index: true },
 }, { timestamps: true });
 
-hostelDeviceSchema.pre('save', async function (next) {
+hostelDeviceSchema.pre('save', async function () {
   if (!this.device_id) {
     const count = await mongoose.model('HostelDevice').countDocuments();
     this.device_id = `DEV-${String(count + 1).padStart(4, '0')}`;
   }
-  next();
 });
 
 module.exports = mongoose.model('HostelDevice', hostelDeviceSchema);

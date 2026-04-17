@@ -2,10 +2,7 @@ const express = require('express');
 const { getTenantFilter } = require('../utils/tenantFilter');
 const router = express.Router();
 const HostelEvent = require('../models/hostel-event.model');
-const ActivityLog = require('../models/activity-log.model');
-
-const log = (action, label, data) =>
-  ActivityLog.create({ module: 'Hostel', action, action_label: label, ...data }).catch(() => {});
+const logActivity = require('../utils/logActivity');
 
 router.get('/', async (req, res) => {
   try {
@@ -38,17 +35,21 @@ router.get('/:id', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const rec = await HostelEvent.create(req.body);
-    log('event_created', 'Event Created', { entity_id: rec.event_id, entity_label: rec.title, details: `${rec.event_type} event created` });
+    const body = { ...req.body };
+    if (body.participants_count !== undefined) body.participants_count = Number(body.participants_count) || 0;
+    const rec = await HostelEvent.create(body);
+    logActivity({ module: 'Hostel', action: 'event_created', label: 'Event Created', entityId: rec.event_id, entityLabel: rec.title, details: `${rec.event_type} event created at ${rec.venue || '—'}`, req });
     res.status(201).json(rec);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 router.put('/:id', async (req, res) => {
   try {
-    const rec = await HostelEvent.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const body = { ...req.body };
+    if (body.participants_count !== undefined) body.participants_count = Number(body.participants_count) || 0;
+    const rec = await HostelEvent.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: true });
     if (!rec) return res.status(404).json({ message: 'Not found' });
-    log('event_updated', 'Event Updated', { entity_id: rec.event_id, entity_label: rec.title });
+    logActivity({ module: 'Hostel', action: 'event_updated', label: 'Event Updated', entityId: rec.event_id, entityLabel: rec.title, details: `Event "${rec.title}" updated`, req });
     res.json(rec);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
@@ -57,7 +58,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const rec = await HostelEvent.findByIdAndDelete(req.params.id);
     if (!rec) return res.status(404).json({ message: 'Not found' });
-    log('event_deleted', 'Event Deleted', { entity_id: rec.event_id, entity_label: rec.title });
+    logActivity({ module: 'Hostel', action: 'event_deleted', label: 'Event Deleted', entityId: rec.event_id, entityLabel: rec.title, details: `Event "${rec.title}" deleted`, req });
     res.json({ message: 'Deleted' });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });

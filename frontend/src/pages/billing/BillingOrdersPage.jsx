@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, ShoppingCart, X, Mail, MessageCircle, Download as DownloadIcon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Search, ShoppingCart, X, Mail, MessageCircle, Download as DownloadIcon, Eye } from 'lucide-react';
+import QuickViewDrawer from '../../components/common/QuickViewDrawer';
+import EntityDropdown from '../../components/common/EntityDropdown';
 import { getBillingOrders, createBillingOrder } from '../../services/billingApi';
 import { useUrlFilters } from '../../hooks/useUrlFilters';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -14,8 +17,8 @@ const STATUS_STYLE = {
   pending: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400',
 };
 
-const COLS = ['Customer ID', 'Customer Name', 'Entity', 'Order ID', 'Fee Category', 'Amount (₹)', 'Attempts', 'Created At', 'Status'];
-const EMPTY_FORM = { customer_name: '', customer_id: '', entity: 'billing_order', fee_category: '', fee_order_amount: '' };
+const COLS = ['Customer ID', 'Customer Name', 'Entity', 'Order ID', 'Fee Category', 'Amount (₹)', 'Attempts', 'Created At', 'Status', ''];
+const EMPTY_FORM = { customer_name: '', customer_id: '', entity: 'billing_order', fee_category: '', fee_order_amount: '', _customerId: '' };
 
 const LIMIT = 20;
 
@@ -26,6 +29,7 @@ function AddModal({ onClose, onSave }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
 
   useEffect(() => {
     if (!form.fee_category && configCategories.length > 0) {
@@ -35,9 +39,11 @@ function AddModal({ onClose, onSave }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.customer_name) return;
     setSaving(true);
     try {
-      await onSave({ ...form, fee_order_amount: parseFloat(form.fee_order_amount) || 0 });
+      const { _customerId, ...payload } = form;
+      await onSave({ ...payload, fee_order_amount: parseFloat(form.fee_order_amount) || 0 });
       onClose();
     } finally {
       setSaving(false);
@@ -54,15 +60,38 @@ function AddModal({ onClose, onSave }) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit} className="px-5 py-4 space-y-3">
-          {[
-            { k: 'customer_name', l: 'Customer Name', req: true },
-            { k: 'customer_id', l: 'Customer ID' },
-          ].map(({ k, l, req }) => (
-            <div key={k}>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1">{l}{req ? ' *' : ''}</label>
-              <input required={req} value={form[k]} onChange={(e) => set(k, e.target.value)} className={inp} />
-            </div>
-          ))}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1">Customer *</label>
+            <EntityDropdown
+              url="/api/billing/customers"
+              labelKey="name"
+              valueKey="_id"
+              value={form._customerId || ''}
+              onChange={(val, _norm, rawItem) => {
+                setSelectedCustomer(rawItem);
+                setForm(f => ({
+                  ...f,
+                  _customerId: val,
+                  customer_name: rawItem?.name || '',
+                  customer_id: rawItem?.customer_id || val,
+                }));
+              }}
+              blankLabel="— Select Customer —"
+            />
+            {selectedCustomer && (
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
+                ID: {selectedCustomer.customer_id} · {selectedCustomer.mobile_number || 'no mobile'}
+              </p>
+            )}
+            {!form._customerId && (
+              <input
+                value={form.customer_name}
+                onChange={(e) => set('customer_name', e.target.value)}
+                placeholder="Or type customer name manually"
+                className={`${inp} mt-2`}
+              />
+            )}
+          </div>
 
           {/* Fee Category — from Configuration */}
           <div>
@@ -98,6 +127,7 @@ function AddModal({ onClose, onSave }) {
 }
 
 export default function BillingOrdersPage() {
+  const navigate = useNavigate();
   const [urlParams, setUrlParams] = useUrlFilters({ q: '', page: '1' });
   const search = urlParams.q;
   const page   = Number(urlParams.page) || 1;
@@ -107,6 +137,7 @@ export default function BillingOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [showModal, setShowModal] = useState(false);
+  const [quickView, setQuickView] = useState(null);
   const { toasts, toast } = useToast();
 
   const fetchData = useCallback(async () => {
@@ -143,6 +174,7 @@ export default function BillingOrdersPage() {
   return (
     <>
       <Toasts toasts={toasts} />
+      {quickView && <QuickViewDrawer entityType="orders" entityId={quickView} onClose={() => setQuickView(null)} title="Order" />}
       {showModal && <AddModal onClose={() => setShowModal(false)} onSave={handleCreate} />}
 
       <div className="space-y-6">
@@ -151,7 +183,7 @@ export default function BillingOrdersPage() {
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">Orders</h1>
             <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">Billing orders management</p>
           </div>
-          <button onClick={() => setShowModal(true)}
+          <button onClick={() => navigate('/admin/billing/create-order')}
             className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
             <Plus size={16} /> Order
           </button>
@@ -206,6 +238,9 @@ export default function BillingOrdersPage() {
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold uppercase ${STATUS_STYLE[o.order_status] || STATUS_STYLE.created}`}>
                           {o.order_status}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => setQuickView(o._id)} title="Quick View" className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"><Eye size={13} /></button>
                       </td>
                     </tr>
                   ))

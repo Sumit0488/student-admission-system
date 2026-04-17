@@ -19,12 +19,11 @@ const hostelTimesheetSchema = new mongoose.Schema({
 
 hostelTimesheetSchema.index({ date: -1, usn: 1 });
 
-hostelTimesheetSchema.pre('save', async function (next) {
+hostelTimesheetSchema.pre('save', async function () {
   if (!this.record_id) {
     const count = await mongoose.model('HostelTimesheet').countDocuments();
     this.record_id = `TS-${String(count + 1).padStart(5, '0')}`;
   }
-  next();
 });
 
 module.exports = mongoose.model('HostelTimesheet', hostelTimesheetSchema);

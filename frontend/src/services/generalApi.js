@@ -5,6 +5,7 @@ export const getGeneralStudents = (params) => api.get('/api/general/students', {
 export const createGeneralStudent = (data) => api.post('/api/general/students', data);
 export const updateGeneralStudent = (id, data) => api.put(`/api/general/students/${id}`, data);
 export const deleteGeneralStudent = (id) => api.delete(`/api/general/students/${id}`);
+export const bulkUploadGeneralStudents = (rows) => api.post('/api/general/students/bulk-upload', { rows });
 
 // Scholarships
 export const getScholarships = (params) => api.get('/api/general/scholarships', { params });

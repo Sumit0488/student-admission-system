@@ -4,8 +4,13 @@ const router = express.Router();
 const HostelAsset = require('../models/hostel-asset.model');
 const ActivityLog = require('../models/activity-log.model');
 
-const log = (action, label, data) =>
-  ActivityLog.create({ module: 'Hostel', action, action_label: label, ...data }).catch(() => {});
+const log = (action, label, data, req) =>
+  ActivityLog.create({
+    module: 'Hostel', action, action_label: label,
+    performed_by: req?.user?.name || req?.user?.email || 'Admin',
+    ip: req?.ip, tenantId: req?.tenantId || null,
+    ...data,
+  }).catch(() => {});
 
 // GET all assets
 router.get('/', async (req, res) => {
@@ -42,7 +47,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const rec = await HostelAsset.create(req.body);
-    log('asset_issued', 'Asset Issued', { entity_id: rec.issue_id, entity_label: rec.item_name, student_name: rec.student_name, usn: rec.usn, details: `${rec.item_name} issued to ${rec.student_name}` });
+    log('asset_issued', 'Asset Issued', { entity_id: rec.issue_id, entity_label: rec.item_name, student_name: rec.student_name, usn: rec.usn, details: `${rec.item_name} issued to ${rec.student_name}` }, req);
     res.status(201).json(rec);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
@@ -54,9 +59,9 @@ router.put('/:id', async (req, res) => {
     if (!rec) return res.status(404).json({ message: 'Not found' });
     const wasReturned = req.body.status === 'Returned' && req.body.actual_return_date;
     if (wasReturned) {
-      log('asset_returned', 'Asset Returned', { entity_id: rec.issue_id, entity_label: rec.item_name, student_name: rec.student_name, usn: rec.usn, details: `${rec.item_name} returned by ${rec.student_name}` });
+      log('asset_returned', 'Asset Returned', { entity_id: rec.issue_id, entity_label: rec.item_name, student_name: rec.student_name, usn: rec.usn, details: `${rec.item_name} returned by ${rec.student_name}` }, req);
     } else {
-      log('asset_updated', 'Asset Updated', { entity_id: rec.issue_id, entity_label: rec.item_name, student_name: rec.student_name, usn: rec.usn });
+      log('asset_updated', 'Asset Updated', { entity_id: rec.issue_id, entity_label: rec.item_name, student_name: rec.student_name, usn: rec.usn }, req);
     }
     res.json(rec);
   } catch (e) { res.status(400).json({ message: e.message }); }
@@ -67,7 +72,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const rec = await HostelAsset.findByIdAndDelete(req.params.id);
     if (!rec) return res.status(404).json({ message: 'Not found' });
-    log('asset_deleted', 'Asset Record Deleted', { entity_id: rec.issue_id, entity_label: rec.item_name, student_name: rec.student_name });
+    log('asset_deleted', 'Asset Record Deleted', { entity_id: rec.issue_id, entity_label: rec.item_name, student_name: rec.student_name }, req);
     res.json({ message: 'Deleted' });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
@@ -80,7 +85,7 @@ router.post('/:id/return', async (req, res) => {
       { status: 'Returned', actual_return_date: new Date(), condition_at_return: req.body.condition || 'Good', remarks: req.body.remarks },
       { new: true }
     );
-    log('asset_returned', 'Asset Returned', { entity_id: rec.issue_id, entity_label: rec.item_name, student_name: rec.student_name, usn: rec.usn, details: `Returned in ${req.body.condition || 'Good'} condition` });
+    log('asset_returned', 'Asset Returned', { entity_id: rec.issue_id, entity_label: rec.item_name, student_name: rec.student_name, usn: rec.usn, details: `Returned in ${req.body.condition || 'Good'} condition` }, req);
     res.json(rec);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });

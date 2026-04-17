@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Download, Eye, Pencil, Printer, Trash2, FileText, AlertCircle, CheckCircle, X } from 'lucide-react';
-import { getBillingPayRecords, createBillingPayRecord } from '../../services/billingApi';
+import { getBillingPayRecords, createBillingPayRecord, deleteBillingPayRecord } from '../../services/billingApi';
+import QuickViewDrawer from '../../components/common/QuickViewDrawer';
 
 function useToast() {
   const [toasts, setToasts] = useState([]);
@@ -105,6 +106,7 @@ export default function BillingPayRecordsPage() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [quickView, setQuickView] = useState(null);
   const [finYear, setFinYear] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const { toasts, toast } = useToast();
@@ -137,6 +139,17 @@ export default function BillingPayRecordsPage() {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this pay record?')) return;
+    try {
+      await deleteBillingPayRecord(id);
+      setRecords((p) => p.filter((r) => r._id !== id));
+      toast('Pay record deleted');
+    } catch {
+      toast('Failed to delete', 'error');
+    }
+  };
+
   const fmtDate = (d) => {
     if (!d) return '—';
     const dt = new Date(d);
@@ -147,6 +160,7 @@ export default function BillingPayRecordsPage() {
   return (
     <>
       <Toasts toasts={toasts} />
+      {quickView && <QuickViewDrawer entityType="pay-records" entityId={quickView} onClose={() => setQuickView(null)} title="Pay Record" />}
       {showModal && <AddModal onClose={() => setShowModal(false)} onSave={handleCreate} />}
 
       <div className="space-y-6">
@@ -209,10 +223,10 @@ export default function BillingPayRecordsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          <button className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"><Eye size={13} /></button>
-                          <button className="p-1.5 text-gray-400 hover:text-green-600 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"><Pencil size={13} /></button>
-                          <button className="p-1.5 text-gray-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"><Printer size={13} /></button>
-                          <button className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"><Trash2 size={13} /></button>
+                          <button onClick={() => setQuickView(r._id)} title="Quick View" className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"><Eye size={13} /></button>
+                          <button onClick={() => {}} title="Edit" className="p-1.5 text-gray-400 hover:text-green-600 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"><Pencil size={13} /></button>
+                          <button onClick={() => window.print()} title="Print" className="p-1.5 text-gray-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"><Printer size={13} /></button>
+                          <button onClick={() => handleDelete(r._id)} title="Delete" className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"><Trash2 size={13} /></button>
                         </div>
                       </td>
                     </tr>

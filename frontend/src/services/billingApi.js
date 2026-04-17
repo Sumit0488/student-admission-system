@@ -4,6 +4,7 @@ import api from './api';
 export const getBillingCustomers = (params) => api.get('/api/billing/customers', { params });
 export const createBillingCustomer = (data) => api.post('/api/billing/customers', data);
 export const updateBillingCustomer = (id, data) => api.put(`/api/billing/customers/${id}`, data);
+export const bulkUploadCustomers = (rows) => api.post('/api/billing/customers/bulk-upload', { rows });
 
 // Billing Orders
 export const getBillingOrders = (params) => api.get('/api/billing/orders', { params });
@@ -17,3 +18,7 @@ export const getBillingTransactions = (params) => api.get('/api/billing/transact
 // Billing Pay Records
 export const getBillingPayRecords = (params) => api.get('/api/billing/pay-records', { params });
 export const createBillingPayRecord = (data) => api.post('/api/billing/pay-records', data);
+export const deleteBillingPayRecord = (id) => api.delete(`/api/billing/pay-records/${id}`);
+
+// Collect payment against an order
+export const collectBillingPayment = (orderId, data) => api.post(`/api/billing/orders/${orderId}/collect`, data);

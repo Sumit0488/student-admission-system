@@ -1,20 +1,10 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-const INSTITUTION = 'Jnana Ganga Institute of Technology';
+const DEFAULT_INSTITUTION = 'Institution';
 
-/**
- * Generate a professional PDF report and trigger browser download.
- *
- * @param {object} opts
- * @param {string}   opts.title       - Report title shown in header
- * @param {object}   opts.filters     - Active filter key/value map (for summary line)
- * @param {string[]} opts.columns     - Table column headers
- * @param {Array[]}  opts.rows        - 2D array of row cell values
- * @param {string}   [opts.filename]  - Override download filename
- * @param {'portrait'|'landscape'} [opts.orientation='landscape']
- */
-export function generatePDF({ title, filters = {}, columns, rows, filename, orientation = 'landscape' }) {
+export function generatePDF({ title, filters = {}, columns, rows, filename, orientation = 'landscape', institution }) {
+  const INSTITUTION = institution || DEFAULT_INSTITUTION;
   const doc = new jsPDF({ orientation, unit: 'mm', format: 'a4' });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronRight, BarChart2, ChevronLeft, RefreshCw, Download, FileText } from 'lucide-react';
 import { generatePDF, inr, fmtD } from '../../utils/pdfReport';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const PROGRAMS = ['All','Computer Science and Engineering','Electronics and Communication Engineering','Mechanical Engineering','Civil Engineering','Electrical and Electronics Engineering'];
@@ -199,6 +200,7 @@ function fmtDate(iso) {
 
 function ReportDetailPage({ reportKey, onBack }) {
   const cfg = REPORT_CONFIGS[reportKey];
+  const { tenant } = useAuth();
   const initFilters = () => {
     const f = {};
     cfg.filters.forEach((fi) => { f[fi.id] = fi.options[0]; });
@@ -234,6 +236,7 @@ function ReportDetailPage({ reportKey, onBack }) {
       columns: cfg.pdfColumns,
       rows: pdfRows,
       filename: `${cfg.name.replace(/\s+/g, '_')}_${Date.now()}`,
+      institution: tenant?.name,
     });
   };
 

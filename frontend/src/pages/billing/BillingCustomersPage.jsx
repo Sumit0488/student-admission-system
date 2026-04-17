@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Users, X, Mail, MessageCircle, Download } from 'lucide-react';
-import { getBillingCustomers, createBillingCustomer } from '../../services/billingApi';
+import { Plus, Search, Users, X, Mail, MessageCircle, Download, Upload, Eye } from 'lucide-react';
+import { getBillingCustomers, createBillingCustomer, bulkUploadCustomers } from '../../services/billingApi';
+import BulkUploadModal from '../../components/common/BulkUploadModal';
+import EntityDropdown from '../../components/common/EntityDropdown';
+import QuickViewDrawer from '../../components/common/QuickViewDrawer';
+
+const CUSTOMER_SAMPLE_HEADERS = ['name', 'mobile_number', 'email', 'stream', 'program'];
+const CUSTOMER_REQUIRED_COLS = ['name'];
 import { useUrlFilters } from '../../hooks/useUrlFilters';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useToast } from '../../hooks/useToast';
@@ -11,7 +17,7 @@ const STATUS_STYLE = {
   Inactive: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400',
 };
 
-const COLS = ['ID', 'Name', 'Mobile Number', 'Email', 'Stream', 'Program', 'Status'];
+const COLS = ['ID', 'Name', 'Mobile Number', 'Email', 'Stream', 'Program', 'Status', ''];
 const EMPTY_FORM = { name: '', mobile_number: '', email: '', stream: '', program: '' };
 
 const LIMIT = 20;
@@ -19,10 +25,21 @@ const LIMIT = 20;
 function AddModal({ onClose, onSave }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [phoneError, setPhoneError] = useState('');
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  const handlePhone = (v) => {
+    const digits = v.replace(/\D/g, '').slice(0, 10);
+    set('mobile_number', digits);
+    setPhoneError(digits && digits.length !== 10 ? 'Mobile number must be 10 digits' : '');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (form.mobile_number && !/^\d{10}$/.test(form.mobile_number)) {
+      setPhoneError('Mobile number must be 10 digits');
+      return;
+    }
     setSaving(true);
     try {
       await onSave(form);
@@ -32,6 +49,8 @@ function AddModal({ onClose, onSave }) {
     }
   };
 
+  const inp = 'w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md">
@@ -40,22 +59,46 @@ function AddModal({ onClose, onSave }) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit} className="px-5 py-4 space-y-3">
-          {[
-            { k: 'name', l: 'Full Name', req: true },
-            { k: 'mobile_number', l: 'Mobile Number' },
-            { k: 'email', l: 'Email', type: 'email' },
-            { k: 'stream', l: 'Stream' },
-            { k: 'program', l: 'Program' },
-          ].map(({ k, l, req, type }) => (
-            <div key={k}>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1">{l}{req ? ' *' : ''}</label>
-              <input required={req} type={type || 'text'} value={form[k]} onChange={(e) => set(k, e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400" />
-            </div>
-          ))}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1">Full Name *</label>
+            <input required value={form.name} onChange={(e) => set('name', e.target.value)} className={inp} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1">Mobile Number</label>
+            <input
+              type="tel" value={form.mobile_number}
+              onChange={(e) => handlePhone(e.target.value)}
+              maxLength={10} inputMode="numeric"
+              className={`${inp} ${phoneError ? 'border-red-400 focus:ring-red-400' : ''}`}
+              placeholder="10-digit number"
+            />
+            {phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1">Email</label>
+            <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} className={inp} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1">Stream</label>
+            <EntityDropdown
+              url="/api/config/stream"
+              value={form.stream}
+              onChange={(val) => set('stream', val)}
+              blankLabel="— Select Stream —"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1">Program</label>
+            <EntityDropdown
+              url="/api/config/program"
+              value={form.program}
+              onChange={(val) => set('program', val)}
+              blankLabel="— Select Program —"
+            />
+          </div>
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 dark:border-slate-700">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors">Cancel</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">{saving ? 'Saving...' : 'Add Customer'}</button>
+            <button type="submit" disabled={saving || !!phoneError} className="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">{saving ? 'Saving...' : 'Add Customer'}</button>
           </div>
         </form>
       </div>
@@ -74,7 +117,9 @@ export default function BillingCustomersPage() {
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [showModal, setShowModal] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
   const [selected, setSelected] = useState([]);
+  const [quickView, setQuickView] = useState(null);
   const { toasts, toast } = useToast();
 
   const allChecked = customers.length > 0 && customers.every((c) => selected.includes(c._id));
@@ -113,7 +158,21 @@ export default function BillingCustomersPage() {
   return (
     <>
       <Toasts toasts={toasts} />
+      {quickView && <QuickViewDrawer entityType="customers" entityId={quickView} onClose={() => setQuickView(null)} title="Customer" />}
       {showModal && <AddModal onClose={() => setShowModal(false)} onSave={handleCreate} />}
+      {showBulkModal && (
+        <BulkUploadModal
+          title="Bulk Upload Customers"
+          uploadFn={bulkUploadCustomers}
+          sampleHeaders={CUSTOMER_SAMPLE_HEADERS}
+          sampleFilename="customers_template.csv"
+          requiredColumns={CUSTOMER_REQUIRED_COLS}
+          notes={['name is required. mobile_number, email, stream, program are optional.']}
+          errorKey="name"
+          onClose={() => setShowBulkModal(false)}
+          onSuccess={() => fetchData()}
+        />
+      )}
 
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -121,10 +180,16 @@ export default function BillingCustomersPage() {
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">Customers</h1>
             <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">Manage billing customers</p>
           </div>
-          <button onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-            <Plus size={16} /> Customer
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowBulkModal(true)}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-semibold border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+              <Upload size={15} />
+            </button>
+            <button onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+              <Plus size={16} /> Customer
+            </button>
+          </div>
         </div>
 
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
@@ -193,6 +258,9 @@ export default function BillingCustomersPage() {
                       <td className="px-4 py-3 text-gray-600 dark:text-slate-300">{c.program || '—'}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_STYLE[c.status]}`}>{c.status}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => setQuickView(c._id)} title="Quick View" className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"><Eye size={13} /></button>
                       </td>
                     </tr>
                   ))

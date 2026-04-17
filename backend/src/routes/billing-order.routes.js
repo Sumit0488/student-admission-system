@@ -83,4 +83,65 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// POST /api/billing/orders/:id/collect — record a payment against an order
+router.post('/:id/collect', async (req, res) => {
+  try {
+    const BillingTransaction = require('../models/billing-transaction.model');
+    const order = await BillingOrder.findById(req.params.id);
+    if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
+
+    const payAmount = parseFloat(req.body.amount) || 0;
+    if (payAmount <= 0) return res.status(400).json({ success: false, error: 'Invalid amount' });
+
+    const alreadyPaid = order.fee_paid_amount || 0;
+    const orderTotal  = order.fee_order_amount || 0;
+    const remaining   = orderTotal - alreadyPaid;
+
+    if (payAmount > remaining + 0.01) {
+      return res.status(400).json({ success: false, error: `Amount exceeds remaining balance ₹${remaining}` });
+    }
+
+    const receiptNo = `REC-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+    const txn = new BillingTransaction({
+      order_id: order._id,
+      order_custom_id: order.order_id,
+      customer_id: order.customer_id,
+      customer_name: order.customer_name,
+      fee_category: order.fee_category,
+      pay_amount: payAmount,
+      method: req.body.method || 'CASH',
+      offline_ref: req.body.reference_no || '',
+      description: req.body.description || '',
+      pay_status: 'captured',
+      captured_date: new Date(),
+      receipt_no: receiptNo,
+      ...(req.tenantId && { tenantId: req.tenantId }),
+    });
+    await txn.save();
+
+    const newPaid   = alreadyPaid + payAmount;
+    const newDue    = Math.max(0, orderTotal - newPaid);
+    const newStatus = newDue <= 0.01 ? 'paid' : 'partial';
+
+    order.fee_paid_amount = newPaid;
+    order.fee_due_amount  = newDue;
+    order.order_status    = newStatus;
+    order.attempts        = (order.attempts || 0) + 1;
+    await order.save();
+
+    log('payment_collected', 'Payment Collected', {
+      entity_id: order.order_id,
+      entity_label: order.customer_name,
+      student_name: order.customer_name,
+      amount: payAmount,
+      details: `₹${payAmount} via ${req.body.method || 'CASH'}`,
+    }, req);
+
+    res.json({ success: true, data: { order, transaction: txn } });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

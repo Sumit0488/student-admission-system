@@ -6,6 +6,7 @@ import {
   Plus, Trash2, CheckCircle, AlertCircle, ChevronRight,
 } from 'lucide-react';
 import { getMasterData, addMasterData, deleteMasterData, seedMasterData } from '../../services/configApi';
+import { runBackfillReceipts } from '../../services/maintenanceApi';
 import { getMe, getInstitution, updateInstitution } from '../../services/authApi';
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -422,6 +423,7 @@ function UserManagement() {
 
 function DataManagement() {
   const [seedLoading, setSeedLoading] = useState(false);
+  const [backfillLoading, setBackfillLoading] = useState(false);
   const { toasts, toast } = useToast();
 
   const handleSeedDefaults = async () => {
@@ -436,23 +438,53 @@ function DataManagement() {
     }
   };
 
+  const handleBackfill = async () => {
+    if (!window.confirm('This will generate receipt/reference numbers for all existing records missing them. Continue?')) return;
+    setBackfillLoading(true);
+    try {
+      const { data } = await runBackfillReceipts();
+      toast(data.message || 'Backfill complete');
+    } catch (err) {
+      toast(err?.response?.data?.error || 'Backfill failed', 'error');
+    } finally {
+      setBackfillLoading(false);
+    }
+  };
+
   return (
     <>
       <Toasts toasts={toasts} />
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm p-6">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Seed Default Data</h3>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">
-            Load default programs, batches, quotas and lookup values into the system.
-          </p>
-          <button
-            type="button"
-            onClick={handleSeedDefaults}
-            disabled={seedLoading}
-            className="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60"
-          >
-            {seedLoading ? 'Seeding...' : 'Seed Defaults'}
-          </button>
+        <div className="space-y-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm p-6">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Seed Default Data</h3>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">
+              Load default programs, batches, quotas and lookup values into the system.
+            </p>
+            <button
+              type="button"
+              onClick={handleSeedDefaults}
+              disabled={seedLoading}
+              className="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60"
+            >
+              {seedLoading ? 'Seeding...' : 'Seed Defaults'}
+            </button>
+          </div>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-orange-200 dark:border-orange-800/40 shadow-sm p-6">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Backfill Receipt & Reference Numbers</h3>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">
+              Generate missing <code className="text-xs bg-gray-100 dark:bg-slate-700 px-1 rounded">receipt_no</code> for transactions
+              and <code className="text-xs bg-gray-100 dark:bg-slate-700 px-1 rounded">ref_no</code> for pay records that were created before auto-generation was enabled.
+            </p>
+            <button
+              type="button"
+              onClick={handleBackfill}
+              disabled={backfillLoading}
+              className="px-4 py-2 text-sm font-semibold bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-60"
+            >
+              {backfillLoading ? 'Running…' : 'Run Backfill'}
+            </button>
+          </div>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm p-6">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Support Data</h3>

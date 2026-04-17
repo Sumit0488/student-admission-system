@@ -47,7 +47,9 @@ const streamRoutes = require('./routes/stream.routes');
 const academicProgramRoutes = require('./routes/academic-program.routes');
 // Settings route
 const settingsRoutes = require('./routes/settings.routes');
-const { softAuth, requireAuth } = require('./middleware/auth');
+const formRoutes = require('./routes/form.routes');
+const maintenanceRoutes = require('./routes/maintenance.routes');
+const { softAuth, requireAuth, attachTenant } = require('./middleware/auth');
 const { globalErrorHandler } = require('./utils/errorHandler');
 const superAdminRoutes = require('./routes/super-admin.routes');
 const userManagementRoutes = require('./routes/user-management.routes');
@@ -99,8 +101,9 @@ app.use(express.json({ limit: '100kb' }));
 
 app.use('/api', apiLimiter); // rate-limit all /api/* routes
 
-// ─── Attach tenantId from JWT to every request (optional — no hard rejection) ─
+// ─── Attach tenantId from JWT, then fetch full Tenant document ────────────────
 app.use(softAuth);
+app.use(attachTenant);
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
@@ -151,6 +154,10 @@ app.use('/api/activity-logs', activityLogRoutes);
 app.use('/api/academic/streams', streamRoutes);
 app.use('/api/academic/programs', academicProgramRoutes);
 app.use('/api/settings', settingsRoutes);
+// Forms
+app.use('/api/forms', formRoutes);
+// Maintenance (backfill, cleanup utilities)
+app.use('/api/maintenance', maintenanceRoutes);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
