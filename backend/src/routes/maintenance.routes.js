@@ -36,6 +36,45 @@ router.post('/backfill-receipts', requireAuth, adminOrAbove, async (req, res) =>
   }
 });
 
+// POST /api/maintenance/backfill-billing-order-refs
+// For BillingTransactions missing customer_id or order_custom_id, look up the linked BillingOrder and copy those fields.
+router.post('/backfill-billing-order-refs', requireAuth, adminOrAbove, async (req, res) => {
+  try {
+    const BillingTransaction = require('../models/billing-transaction.model');
+    const BillingOrder = require('../models/billing-order.model');
+
+    const txns = await BillingTransaction.find({
+      order_id: { $exists: true, $ne: null },
+      $or: [
+        { customer_id: { $in: [null, '', undefined] } },
+        { order_custom_id: { $in: [null, '', undefined] } },
+      ],
+    }).lean();
+
+    let updated = 0;
+    for (const txn of txns) {
+      const order = await BillingOrder.findById(txn.order_id).lean();
+      if (!order) continue;
+      await BillingTransaction.updateOne(
+        { _id: txn._id },
+        {
+          $set: {
+            customer_id: txn.customer_id || order.customer_id || '',
+            customer_name: txn.customer_name || order.customer_name || '',
+            order_custom_id: txn.order_custom_id || order.order_id || '',
+            fee_category: txn.fee_category || order.fee_category || '',
+          },
+        }
+      );
+      updated++;
+    }
+
+    res.json({ success: true, data: { updated }, message: `Backfill complete: ${updated} transactions updated.` });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // GET /api/maintenance/stats — count records missing receipt/ref numbers
 router.get('/stats', requireAuth, adminOrAbove, async (req, res) => {
   try {

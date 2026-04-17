@@ -2,6 +2,8 @@ const express = require('express');
 const { getTenantFilter } = require('../utils/tenantFilter');
 const router = express.Router();
 const BillingTransaction = require('../models/billing-transaction.model');
+const BillingCustomer = require('../models/billing-customer.model');
+const BillingOrder = require('../models/billing-order.model');
 const logActivity = require('../utils/logActivity');
 
 router.get('/', async (req, res) => {
@@ -22,7 +24,20 @@ router.get('/', async (req, res) => {
       BillingTransaction.countDocuments(filter),
     ]);
 
-    // Map populated order fields onto transaction if not already stored
+    // Collect customer names that still lack a customer_id for batch lookup
+    const missingNames = [...new Set(
+      rawData
+        .filter((t) => !t.customer_id && t.customer_name)
+        .map((t) => t.customer_name)
+    )];
+
+    const customerMap = {};
+    if (missingNames.length) {
+      const tf = getTenantFilter(req.tenantId);
+      const customers = await BillingCustomer.find({ ...tf, name: { $in: missingNames } }).lean();
+      customers.forEach((c) => { customerMap[c.name] = c.customer_id; });
+    }
+
     const data = rawData.map((t) => {
       const obj = t.toObject();
       const order = obj.order_id;
@@ -32,8 +47,45 @@ router.get('/', async (req, res) => {
         if (!obj.customer_name) obj.customer_name = order.customer_name;
         obj.order_id = order._id;
       }
+      // Fallback: resolve customer_id from BillingCustomer by name
+      if (!obj.customer_id && obj.customer_name && customerMap[obj.customer_name]) {
+        obj.customer_id = customerMap[obj.customer_name];
+      }
       return obj;
     });
+
+    // Batch-lookup BillingOrder for transactions still missing order_custom_id or fee_category
+    const needsOrder = data.filter((t) => !t.order_custom_id || !t.fee_category);
+    if (needsOrder.length) {
+      const tf2 = getTenantFilter(req.tenantId);
+      const cids   = [...new Set(needsOrder.map((t) => t.customer_id).filter(Boolean))];
+      const cnames = [...new Set(needsOrder.map((t) => t.customer_name).filter(Boolean))];
+
+      const orQuery = [];
+      if (cids.length)   orQuery.push({ customer_id: { $in: cids } });
+      if (cnames.length) orQuery.push({ customer_name: { $in: cnames } });
+
+      if (orQuery.length) {
+        const orders = await BillingOrder.find({ ...tf2, $or: orQuery })
+          .sort({ created_at: -1 })
+          .select('customer_id customer_name order_id fee_category')
+          .lean();
+
+        // Build lookup maps by customer_id and customer_name (latest order wins)
+        const byId = {}, byName = {};
+        orders.forEach((o) => {
+          if (o.customer_id && !byId[o.customer_id])   byId[o.customer_id]   = o;
+          if (o.customer_name && !byName[o.customer_name]) byName[o.customer_name] = o;
+        });
+
+        data.forEach((t) => {
+          const o = (t.customer_id && byId[t.customer_id]) || (t.customer_name && byName[t.customer_name]);
+          if (!o) return;
+          if (!t.order_custom_id) t.order_custom_id = o.order_id;
+          if (!t.fee_category)    t.fee_category    = o.fee_category;
+        });
+      }
+    }
 
     res.json({ success: true, data, total, page, limit });
   } catch (err) {
@@ -44,7 +96,6 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const mongoose = require('mongoose');
-    const BillingOrder = require('../models/billing-order.model');
     const bodyData = { ...req.body };
 
     // Auto-fill customer_id and order_custom_id from linked BillingOrder

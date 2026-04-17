@@ -6,6 +6,12 @@ const generatePaymentId = () => {
   return `PAY-${ts}-${rand}`;
 };
 
+const generateReceiptNo = () => {
+  const ts = Date.now().toString(36).toUpperCase();
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `REC-${ts}-${rand}`;
+};
+
 const feeTransactionSchema = new mongoose.Schema(
   {
     institution_id: { type: String, trim: true },
@@ -17,7 +23,7 @@ const feeTransactionSchema = new mongoose.Schema(
     pay_status: { type: String, trim: true, default: 'captured' },
     order_id: { type: mongoose.Schema.Types.ObjectId, ref: 'FeeOrder' },
     order_custom_id: { type: String, trim: true },
-    receipt_no: { type: String, trim: true },
+    receipt_no: { type: String, trim: true, default: generateReceiptNo },
     pay_records: [
       {
         fee_head: { type: String, trim: true },
